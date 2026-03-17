@@ -1,0 +1,1410 @@
+{
+  "project": "NSE AI Research Platform",
+  "version": "2.0",
+  "schema_version": "1.0",
+  "description": "Granular save points for the full planning and construction lifecycle. Each save point must be completed and verified before dependents begin. Status: pending | in_progress | complete | blocked.",
+  "last_updated": "2026-03-17",
+  "legend": {
+    "priority": {
+      "critical": "Blocks all downstream work. Must be done first.",
+      "high": "Needed for core functionality. Prioritise over medium/low.",
+      "medium": "Important but not immediately blocking.",
+      "low": "Nice-to-have or deferred enhancement."
+    },
+    "status": {
+      "pending": "Not started.",
+      "in_progress": "Actively being worked on.",
+      "complete": "All acceptance criteria met and verified.",
+      "blocked": "Cannot proceed — dependency unresolved or external blocker."
+    }
+  },
+
+  "phases": [
+
+    {
+      "phase_id": "PH-00",
+      "name": "Foundation & Repository Setup",
+      "description": "Create all scaffolding and shared tokens before any code is written.",
+      "savepoints": [
+
+        {
+          "id": "SP-00-01",
+          "name": "Repository Initialised",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 1,
+          "completed_at": null,
+          "dependencies": [],
+          "tasks": [
+            "Create private GitHub repository: nse-ai-platform",
+            "Initialise root README.md describing the project",
+            "Create .gitignore covering: .env*, node_modules/, __pycache__/, .next/, dist/, venv/, *.pyc, .DS_Store",
+            "Create root directory structure: frontend/, api/, workers/, supabase/, .github/workflows/",
+            "Commit savepoints.json to project root",
+            "Create develop branch; enable branch protection on main (require PRs, require CI green)",
+            "Add CODEOWNERS file mapping /workers/ to backend owner and /frontend/ to frontend owner"
+          ],
+          "acceptance_criteria": [
+            "GitHub repository accessible and private",
+            "Directory structure matches spec in Section 16.8 of architecture doc",
+            "savepoints.json present at repository root",
+            ".gitignore covers all build artifacts and secret files",
+            "Branch protection active on main — direct pushes rejected"
+          ],
+          "outputs": ["GitHub repository URL", "Initial commit SHA"],
+          "notes": "This is the very first action. Nothing else can start until the repo exists."
+        },
+
+        {
+          "id": "SP-00-02",
+          "name": "Environment Variables Documented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 0.5,
+          "completed_at": null,
+          "dependencies": ["SP-00-01"],
+          "tasks": [
+            "Create root .env.example listing all 8 required environment variables with placeholder values and comments",
+            "Create api/.env.example for Node.js-specific vars",
+            "Create workers/.env.example for Python-specific vars",
+            "In README, add 'Environment Setup' section explaining each variable and where to obtain it",
+            "Tag each variable as: PUBLIC (safe for frontend) or PRIVATE (server-only)"
+          ],
+          "acceptance_criteria": [
+            ".env.example lists: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, RESEND_API_KEY, JWT_SECRET, DATABASE_URL, NEXT_PUBLIC_API_URL",
+            "SUPABASE_SERVICE_ROLE_KEY and ANTHROPIC_API_KEY clearly marked PRIVATE",
+            "No real credential values exist anywhere in the repository",
+            "README Environment Setup section complete and accurate"
+          ],
+          "outputs": [".env.example (root)", "api/.env.example", "workers/.env.example"]
+        },
+
+        {
+          "id": "SP-00-03",
+          "name": "Design Tokens Defined",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-00-01"],
+          "tasks": [
+            "Create frontend/tokens/colors.ts: brand colors, signal colors (BUY/HOLD/SELL), impact severity, sentiment, chart palette, neutral scale, dark mode overrides",
+            "Create frontend/tokens/typography.ts: font families (sans/mono/data), full size scale, weight scale, tabular-nums config",
+            "Create frontend/tokens/layout.ts: 4px base spacing scale, responsive breakpoints, sidebar/topbar dimensions, content max-width",
+            "Create frontend/tokens/elevation.ts: 6-level shadow scale",
+            "Create frontend/tokens/animations.ts: duration, easing, reduced-motion overrides",
+            "Create frontend/tokens/index.ts re-exporting all tokens",
+            "Configure tailwind.config.ts to consume all token values via CSS variables",
+            "Create frontend/styles/globals.css with light and dark CSS variable definitions"
+          ],
+          "acceptance_criteria": [
+            "BUY signal: green-700 on green-100 — contrast ratio ≥ 4.5:1 (WCAG AA) — verified with contrast checker",
+            "SELL signal: red-700 on red-100 — contrast ratio ≥ 4.5:1 — verified",
+            "HOLD signal: amber-700 on amber-100 — contrast ratio ≥ 4.5:1 — verified",
+            "Dark mode CSS variables defined and toggled correctly by adding 'dark' class to <html>",
+            "No hardcoded hex color values outside tokens/ directory",
+            "tailwind.config.ts extends theme with all token categories"
+          ],
+          "outputs": ["frontend/tokens/ directory (6 files)", "tailwind.config.ts", "globals.css"]
+        },
+
+        {
+          "id": "SP-00-04",
+          "name": "CI/CD Pipelines Configured",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-00-01"],
+          "tasks": [
+            "Create .github/workflows/test.yml: python-tests job, node-tests job, e2e-tests job (as per Section 20.7)",
+            "Create .github/workflows/security.yml: npm audit, pip-audit, TruffleHog secret scanning (Section 21.9)",
+            "Create .github/workflows/daily-digest.yml: cron '30 15 * * 1-5' — runs send_digest.py",
+            "Create .github/workflows/weekly-review.yml: cron '0 16 * * 0' — runs send_weekly.py",
+            "Add GITHUB_SECRETS placeholders in workflow files with clear TODO comments",
+            "Add workflow status badges to README.md"
+          ],
+          "acceptance_criteria": [
+            "test.yml triggers on push to main and develop",
+            "security.yml triggers on push to main AND on schedule (Mondays)",
+            "daily-digest.yml triggers at 15:30 UTC weekdays (= 18:30 EAT)",
+            "weekly-review.yml triggers at 16:00 UTC Sundays (= 19:00 EAT)",
+            "All workflow files valid YAML (no syntax errors)",
+            "README shows CI badge"
+          ],
+          "outputs": [".github/workflows/ directory (4 workflow files)"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-01",
+      "name": "Database & Supabase Setup",
+      "description": "Establish PostgreSQL schema, RLS policies, seed data, and auth configuration.",
+      "savepoints": [
+
+        {
+          "id": "SP-01-01",
+          "name": "Supabase Project Created",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 1,
+          "completed_at": null,
+          "dependencies": ["SP-00-01"],
+          "tasks": [
+            "Create Supabase project named 'nse-ai-platform' at app.supabase.com — choose region closest to Kenya (eu-west-1 or similar)",
+            "Record SUPABASE_URL and SUPABASE_ANON_KEY in password manager",
+            "Record SUPABASE_SERVICE_ROLE_KEY in password manager — treat as highly sensitive",
+            "Record DATABASE_URL (direct) and POOLER_URL (pgBouncer port 6543) separately",
+            "Install Supabase CLI: npm install -g supabase",
+            "Run: supabase login && supabase link --project-ref [ref-id]",
+            "Verify supabase/config.toml generated with correct project ref"
+          ],
+          "acceptance_criteria": [
+            "Supabase dashboard loads at app.supabase.com/project/[ref]",
+            "supabase status output shows correct project name and region",
+            "All four connection strings securely stored in password manager",
+            "supabase/config.toml present in repository with project_id populated"
+          ],
+          "outputs": ["Supabase project ref ID", "Four connection strings in password manager"]
+        },
+
+        {
+          "id": "SP-01-02",
+          "name": "Schema Migrations Written",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 4,
+          "completed_at": null,
+          "dependencies": ["SP-01-01"],
+          "tasks": [
+            "Write supabase/migrations/001_create_tables.sql — all 10 tables: companies, stock_prices, financials, news_articles, detected_events, analysis_results, portfolio_allocations, signal_evaluations, users, user_preferences, email_logs",
+            "Write supabase/migrations/002_create_indexes.sql — all 9 indexes from Section 7.2 plus GIN index on raw_context",
+            "Write supabase/migrations/003_rls_policies.sql — all RLS policies from Section 21.4 covering all 10 tables",
+            "Write supabase/migrations/004_seed_companies.sql — INSERT for all 20 NSE companies with ticker, name, sector, Yahoo Finance ID in description field",
+            "Write supabase/migrations/005_audit_log.sql — audit_log table creation plus REVOKE UPDATE, DELETE for all roles",
+            "Write supabase/migrations/006_macro_indicators.sql — macro_indicators table for CBK rate, FX, CPI storage",
+            "Validate SQL syntax locally: psql [local-test-db] -f migrations/001_create_tables.sql",
+            "Apply migrations: supabase db push"
+          ],
+          "acceptance_criteria": [
+            "supabase db push completes with 0 errors",
+            "All 11 tables visible in Supabase Table Editor",
+            "All foreign key relationships correct — companies.ticker is FK target for stock_prices, financials, news_articles, analysis_results, signal_evaluations",
+            "RLS is ON for every table (visible in Supabase Auth Policies dashboard)",
+            "20 seed company rows present in companies table",
+            "audit_log INSERT succeeds; UPDATE on audit_log fails with permissions error"
+          ],
+          "outputs": ["6 migration SQL files", "Fully populated schema in Supabase"]
+        },
+
+        {
+          "id": "SP-01-03",
+          "name": "RLS Policies Tested",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-01-02"],
+          "tasks": [
+            "Create two test users in Supabase Auth: test-viewer@example.com (viewer role), test-analyst@example.com (analyst role)",
+            "Test 1 — viewer SELECT on stock_prices: expect 200 rows returned",
+            "Test 2 — viewer INSERT to analysis_results: expect permission denied error",
+            "Test 3 — viewer SELECT from audit_log: expect 0 rows or permission denied",
+            "Test 4 — viewer A SELECT from user_preferences where user_id = viewer B: expect 0 rows",
+            "Test 5 — service_role INSERT to analysis_results: expect success",
+            "Test 6 — service_role INSERT to audit_log: expect success; UPDATE on same row: expect denied",
+            "Document all 6 test results in supabase/tests/rls_test_results.md"
+          ],
+          "acceptance_criteria": [
+            "All 6 RLS isolation tests produce expected results",
+            "Cross-user data leakage test returns exactly 0 rows",
+            "Service role write access confirmed working",
+            "audit_log immutability confirmed (UPDATE denied even for service_role)",
+            "Test results document committed to repository"
+          ],
+          "outputs": ["supabase/tests/rls_test_results.md"]
+        },
+
+        {
+          "id": "SP-01-04",
+          "name": "Supabase Auth Configured",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 1,
+          "completed_at": null,
+          "dependencies": ["SP-01-01"],
+          "tasks": [
+            "Enable email/password authentication in Supabase Auth > Providers",
+            "Set minimum password strength to 'medium' (8+ chars, mixed case + number)",
+            "Add Site URL: http://localhost:3000",
+            "Add Redirect URLs: http://localhost:3000/auth/callback and https://[vercel-domain]/auth/callback",
+            "Configure email templates: confirm signup, reset password, magic link (use platform branding)",
+            "Create first admin user via dashboard; run: UPDATE users SET role='admin' WHERE email='[admin-email]'",
+            "Enable Supabase Realtime for tables: detected_events, analysis_results",
+            "Set email OTP expiry to 3600 seconds (1 hour)"
+          ],
+          "acceptance_criteria": [
+            "Test login with viewer account succeeds — JWT returned",
+            "Test login with wrong password fails — 400 returned, not 500",
+            "Admin user exists in both auth.users and users table with role='admin'",
+            "Realtime enabled for detected_events and analysis_results (visible in Supabase Realtime dashboard)",
+            "Email templates customised with NSE AI Platform branding"
+          ],
+          "outputs": ["Admin account credentials in password manager", "Realtime enabled for 2 tables"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-02",
+      "name": "Python Workers — Data Collection",
+      "description": "All Python ingestion scripts with full validation and test coverage.",
+      "savepoints": [
+
+        {
+          "id": "SP-02-01",
+          "name": "Python Environment Configured",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 1,
+          "completed_at": null,
+          "dependencies": ["SP-00-01"],
+          "tasks": [
+            "Create workers/requirements.txt with pinned versions: supabase==2.x, yfinance==0.2.x, pandas==2.x, pydantic==2.x, httpx==0.27.x, tenacity==8.x, structlog==24.x, pandas-ta==0.3.x, anthropic==0.28.x, python-dotenv==1.0.x, psycopg2-binary==2.9.x, feedparser==6.x, beautifulsoup4==4.x, pdfplumber==0.11.x",
+            "Create workers/.python-version file with content: 3.11",
+            "Create workers/pyproject.toml with project name, version, and pytest configuration",
+            "Create workers/conftest.py with shared pytest fixtures",
+            "Create workers/services/db.py: factory function returning Supabase client from env vars",
+            "Create workers/services/ai.py: factory function returning Anthropic client from env vars",
+            "Create workers/models/ directory (empty __init__.py)",
+            "Test: python3 -c 'import supabase, yfinance, pandas, anthropic, pydantic' — no errors"
+          ],
+          "acceptance_criteria": [
+            "pip install -r requirements.txt completes with no conflicts",
+            "python3 --version returns 3.11.x",
+            "All 12 imports succeed in Python REPL",
+            "services/db.py returns a working Supabase client when valid env vars present",
+            "services/db.py raises a clear ValueError when env vars missing",
+            "pytest --collect-only runs with 0 errors (even with no tests yet)"
+          ],
+          "outputs": ["workers/requirements.txt", "workers/services/db.py", "workers/services/ai.py"]
+        },
+
+        {
+          "id": "SP-02-02",
+          "name": "Pydantic Models Defined",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-02-01", "SP-01-02"],
+          "tasks": [
+            "Create workers/models/prices.py: StockPriceRecord — validators: ticker uppercase, close_kes > 0, price within 30% of 30-day avg (optional runtime check)",
+            "Create workers/models/news.py: NewsArticleRecord — headline required, source_url unique key, sentiment_score between -1.0 and 1.0",
+            "Create workers/models/financials.py: FinancialsRecord — period_type in ('annual','interim'), all monetary values in KES",
+            "Create workers/models/events.py: DetectedEvent — impact_score 0-100 enforced, event_type validated against allowed enum",
+            "Create workers/models/analysis.py: AnalysisResult — signal in ('BUY','HOLD','SELL'), confidence_score 0.0-1.0, key_drivers max 3 items",
+            "Create workers/models/portfolio.py: PortfolioAllocation, PortfolioHolding — weight_pct > 0, holdings list non-empty",
+            "Create workers/tests/unit/test_models.py — minimum 5 test cases per model (valid, invalid price, invalid signal, boundary values, null handling)"
+          ],
+          "acceptance_criteria": [
+            "StockPriceRecord(ticker='scom', close_kes=24.5) raises ValidationError (lowercase ticker)",
+            "StockPriceRecord(ticker='SCOM', close_kes=-1.0) raises ValidationError (negative price)",
+            "DetectedEvent(impact_score=101) raises ValidationError",
+            "AnalysisResult(signal='STRONG BUY') raises ValidationError",
+            "AnalysisResult(confidence_score=1.1) raises ValidationError",
+            "AnalysisResult(key_drivers=['a','b','c','d']) raises ValidationError (max 3)",
+            "pytest tests/unit/test_models.py — all tests pass"
+          ],
+          "outputs": ["workers/models/ (6 model files)", "workers/tests/unit/test_models.py"]
+        },
+
+        {
+          "id": "SP-02-03",
+          "name": "Price Fetcher Implemented & Tested",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 4,
+          "completed_at": null,
+          "dependencies": ["SP-02-02", "SP-01-03"],
+          "tasks": [
+            "Implement workers/data/fetch_prices.py — class PriceIngestionService with method run(tickers: list[str]) -> dict",
+            "Use yfinance.download() with period='1d', interval='15m' for intraday; period='1d', interval='1d' for EOD",
+            "Apply StockPriceRecord validation to every row before insert",
+            "Use Supabase upsert with on_conflict='ticker,price_date' to prevent duplicates",
+            "Add tenacity retry decorator: 3 attempts, exponential backoff 4-60s on HTTPError",
+            "Add structlog logging: ticker, rows_inserted, rows_rejected, duration_ms per run",
+            "Add __main__ block for direct script execution",
+            "Write workers/tests/unit/test_price_validation.py — test all StockPriceRecord validators",
+            "Write workers/tests/integration/test_price_ingestion.py — mock Supabase, mock yfinance"
+          ],
+          "acceptance_criteria": [
+            "python workers/data/fetch_prices.py runs without errors (requires valid env vars and market hours OR mocked data)",
+            "Duplicate price for same ticker + timestamp does NOT create a second row",
+            "Price of -1.0 is rejected and counted in rows_rejected, not inserted",
+            "Structured log output includes ticker, rows_inserted, duration_ms",
+            "Unit tests: 100% line coverage on validation logic",
+            "Integration tests: mock Supabase upsert called exactly once per valid row",
+            "Retry logic: 3 retries with backoff on HTTPError — verified with mock"
+          ],
+          "outputs": ["workers/data/fetch_prices.py", "2 test files for price ingestion"]
+        },
+
+        {
+          "id": "SP-02-04",
+          "name": "News Fetcher Implemented & Tested",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 5,
+          "completed_at": null,
+          "dependencies": ["SP-02-02", "SP-01-03"],
+          "tasks": [
+            "Implement workers/data/fetch_news.py — class NewsIngestionService",
+            "Implement _fetch_rss(url: str) using feedparser — parse title, link, summary, published",
+            "Implement _scrape_nse_announcements() using httpx GET + BeautifulSoup4 table parsing",
+            "Implement _sanitise_text(text: str) — strip HTML tags, decode HTML entities, normalise Unicode, truncate to 2000 chars",
+            "Implement _associate_ticker(text: str) -> str | None — match article text against company name/ticker dictionary",
+            "Use source_url UNIQUE constraint for deduplication (upsert with on_conflict='source_url', do_nothing=True)",
+            "Set is_processed=False on all new articles (sentiment analysis runs separately)",
+            "Write workers/tests/unit/test_news_parsing.py — test sanitise_text, ticker association with sample text",
+            "Write workers/tests/integration/test_news_ingestion.py — mock HTTP responses, verify DB calls"
+          ],
+          "acceptance_criteria": [
+            "RSS parser correctly extracts headline, URL, and published_at from Business Daily feed",
+            "HTML tags stripped from article body: '<p>Hello <b>world</b></p>' → 'Hello world'",
+            "HTML entity decoded: '&amp;' → '&', '&lt;' → '<'",
+            "Text 'Safaricom CEO' maps to ticker 'SCOM'; 'KCB Group' maps to 'KCB'",
+            "Second run with same article URLs inserts 0 new rows (no duplicates)",
+            "All unit and integration tests pass"
+          ],
+          "outputs": ["workers/data/fetch_news.py", "2 test files for news ingestion"]
+        },
+
+        {
+          "id": "SP-02-05",
+          "name": "Financials Ingestion Implemented",
+          "status": "pending",
+          "priority": "medium",
+          "estimated_hours": 5,
+          "completed_at": null,
+          "dependencies": ["SP-02-02", "SP-01-03"],
+          "tasks": [
+            "Create workers/data/manual/ directory for CSV override files",
+            "Create data/manual/scom_financials.csv, eqty_financials.csv, kcb_financials.csv, eabl_financials.csv, kgen_financials.csv — 4 periods each (2022A, 2023A, 2024A, 2024H1)",
+            "Implement workers/data/fetch_financials.py — class FinancialsIngestionService",
+            "Implement _load_manual_csv(filepath: str) as primary ingestion method",
+            "Implement _parse_pdf_report(url: str) using pdfplumber as secondary method",
+            "Apply FinancialsRecord Pydantic validation to all rows",
+            "Upsert with on_conflict='ticker,period_end,period_type'",
+            "Write workers/tests/unit/test_financials_parsing.py"
+          ],
+          "acceptance_criteria": [
+            "After running ingestion, SELECT COUNT(*) FROM financials ≥ 20 rows (5 companies × 4 periods)",
+            "All revenue_kes, ebitda_kes, net_profit_kes, eps_kes populated for each row",
+            "Duplicate insert for same ticker+period produces 0 extra rows",
+            "FinancialsRecord correctly rejects negative EPS for companies not in loss",
+            "Unit tests pass"
+          ],
+          "outputs": ["workers/data/fetch_financials.py", "5 initial CSV files", "Unit tests"]
+        },
+
+        {
+          "id": "SP-02-06",
+          "name": "Macro Indicators Fetcher Implemented",
+          "status": "pending",
+          "priority": "medium",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-02-01", "SP-01-02"],
+          "tasks": [
+            "Add macro_indicators table migration: id, indicator_name, value, unit, period_date, source, created_at",
+            "Implement workers/data/fetch_macro.py — class MacroIngestionService",
+            "Implement _fetch_cbk_rate() using httpx GET on cbk.go.ke monetary policy page + BeautifulSoup4 parsing",
+            "Implement _fetch_fx_rate() using Open Exchange Rates API (free tier)",
+            "Implement _fetch_cpi() using KNBS data source or manual CSV fallback",
+            "Seed macro table with last 12 months of CBK rate, USD/KES, and CPI data from public sources",
+            "Write unit tests for parsing logic"
+          ],
+          "acceptance_criteria": [
+            "Current CBK base rate present in macro_indicators table (verify against official CBK website)",
+            "USD/KES rate within 1% of live interbank rate",
+            "CPI data present for at least last 6 months",
+            "All macro data available for AI analysis context construction (verified by SELECT query)",
+            "Unit tests pass"
+          ],
+          "outputs": ["supabase/migrations/007_macro_indicators.sql", "workers/data/fetch_macro.py"]
+        },
+
+        {
+          "id": "SP-02-07",
+          "name": "All Data Worker Tests Green",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-02-03", "SP-02-04", "SP-02-05", "SP-02-06"],
+          "tasks": [
+            "Run full data worker test suite: cd workers && pytest tests/ -v --cov=. --cov-report=html -m 'not e2e'",
+            "Achieve ≥ 80% overall coverage; 100% on all validation logic",
+            "Fix any failing tests or coverage gaps",
+            "Configure pytest markers: unit, integration, e2e",
+            "Add python-tests job to test.yml GitHub Actions workflow",
+            "Verify: GitHub Actions python-tests job passes on push"
+          ],
+          "acceptance_criteria": [
+            "pytest exits code 0 — all tests pass",
+            "Coverage report shows ≥ 80% on workers/ directory",
+            "Validators at 100% line coverage",
+            "GitHub Actions python-tests job passes in CI"
+          ],
+          "outputs": ["Green CI badge for python-tests", "Coverage HTML report"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-03",
+      "name": "AI Workers — Events, Analysis & Portfolio",
+      "description": "Event detection engine, AI analysis pipeline, and portfolio allocation engine.",
+      "savepoints": [
+
+        {
+          "id": "SP-03-01",
+          "name": "Event Detection Engine Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 5,
+          "completed_at": null,
+          "dependencies": ["SP-02-03", "SP-02-04"],
+          "tasks": [
+            "Implement workers/events/detect_events.py — class EventDetectionService",
+            "Implement calculate_price_z_score(prices: list[float], window: int = 20) -> float",
+            "Implement calculate_volume_z_score(volumes: list[int], window: int = 20) -> float",
+            "Implement detect_price_anomaly(ticker: str) — fetch last 21 sessions from DB, compute z-score, insert event if |z| > 2.5",
+            "Implement impact escalation: base_impact + 15 if volume_z_score > 2.0, capped at 100",
+            "Implement classify_news_event(article: NewsArticle) -> DetectedEvent | None using claude-haiku-3-5 with JSON-enforced prompt from Section 4.3",
+            "Implement LLM circuit breaker class from Section 16.6 — open after 5 failures, recover after 5 min",
+            "Insert all detected events to Supabase detected_events table",
+            "Write workers/tests/unit/test_event_detection.py — all 8 test cases from Section 20.2",
+            "Write workers/tests/integration/test_event_pipeline.py — mock prices + mock AI API"
+          ],
+          "acceptance_criteria": [
+            "Price jump of +25% on stable baseline triggers PRICE_ANOMALY with impact_score ≥ 40",
+            "Simultaneous volume spike adds exactly 15 to impact_score (or caps at 100)",
+            "LLM classifier returns valid JSON for 5 different news article fixtures",
+            "Impact score never exceeds 100 — verified across 20 parametric test cases",
+            "Circuit breaker opens after 5 consecutive mock AI failures",
+            "Circuit breaker auto-recovers after recovery_timeout",
+            "All unit tests pass; integration tests pass with mocked dependencies"
+          ],
+          "outputs": ["workers/events/detect_events.py", "Event detection test suite"]
+        },
+
+        {
+          "id": "SP-03-02",
+          "name": "Technical Analysis Module Implemented",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-02-03"],
+          "tasks": [
+            "Implement workers/analysis/technicals.py — class TechnicalAnalysis",
+            "compute_rsi(prices: pd.Series, period: int = 14) -> dict — return value (0-100) + label (overbought/oversold/neutral)",
+            "compute_macd(prices: pd.Series) -> dict — return macd_line, signal_line, histogram, crossover label",
+            "compute_moving_averages(prices: pd.Series) -> dict — SMA50, SMA200, crossover type (golden/death/none)",
+            "compute_bollinger_bands(prices: pd.Series) -> dict — upper, middle, lower, price position label",
+            "compute_obv_trend(prices: pd.Series, volumes: pd.Series) -> str — rising/falling/neutral",
+            "compute_technical_score(ticker: str) -> float — aggregate 0-100 score from all indicators",
+            "Write workers/tests/unit/test_technical_analysis.py — use fixture price series with known RSI/MACD values"
+          ],
+          "acceptance_criteria": [
+            "RSI calculation for known 14-period test data matches expected value within ±0.5",
+            "MACD bullish crossover correctly identified in test data where MACD crosses above signal line",
+            "Golden Cross detected when 50-day SMA is above 200-day SMA in test data",
+            "Bollinger Band position: price at lower band labelled 'lower_band_touch'",
+            "technical_score stays within 0.0 to 100.0 for all test cases",
+            "Unit tests pass with ≥ 95% coverage on technicals.py"
+          ],
+          "outputs": ["workers/analysis/technicals.py", "Technical analysis unit tests"]
+        },
+
+        {
+          "id": "SP-03-03",
+          "name": "Fundamental Analysis Module Implemented",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-02-05"],
+          "tasks": [
+            "Implement workers/analysis/fundamentals.py — class FundamentalAnalysis",
+            "compute_valuation_metrics(ticker: str) -> dict — P/E, P/B, EV/EBITDA, FCF yield, dividend yield",
+            "compute_profitability_metrics(ticker: str) -> dict — ROE, ROA, net margin, EBITDA margin",
+            "compute_growth_metrics(ticker: str) -> dict — YoY revenue growth, EPS growth, dividend growth",
+            "compute_leverage_metrics(ticker: str) -> dict — D/E ratio, current ratio, interest coverage",
+            "compute_sector_medians(sector: str) -> dict — median for each metric across sector peers",
+            "compute_fundamental_score(ticker: str) -> float — weighted aggregate vs sector medians",
+            "Handle missing data: return partial score if ≥ 50% of metrics available; return None if < 50%",
+            "Write workers/tests/unit/test_fundamental_scoring.py with fixture financial data"
+          ],
+          "acceptance_criteria": [
+            "P/E ratio = price / eps_kes — verified against manually calculated expected value",
+            "ROE = net_profit / equity — verified",
+            "Sector median computed from ≥ 3 companies; gracefully skips if fewer available",
+            "fundamental_score returns None (not 0) when < 50% of data present",
+            "fundamental_score stays within 0.0 to 100.0",
+            "Unit tests pass"
+          ],
+          "outputs": ["workers/analysis/fundamentals.py", "Fundamental analysis unit tests"]
+        },
+
+        {
+          "id": "SP-03-04",
+          "name": "Sentiment Analysis Module Implemented",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-02-04"],
+          "tasks": [
+            "Implement workers/analysis/sentiment.py — class SentimentAnalysis",
+            "score_article(article: NewsArticleRecord) -> float — call claude-haiku-3-5 with structured prompt, parse JSON response, return score -1.0 to 1.0",
+            "score_unprocessed_batch(ticker: str, limit: int = 50) — fetch unprocessed articles, score each, update sentiment_score + sentiment_label + is_processed=True in DB",
+            "compute_aggregate_sentiment(ticker: str, days: int = 7) -> dict — weighted average (recency weight: 1/(days_ago + 1), NSE filing weight: 1.5×)",
+            "Return dict with: score, article_count, positive_count, negative_count, neutral_count",
+            "Write workers/tests/unit/test_sentiment.py — use 5 fixture articles with known expected sentiment"
+          ],
+          "acceptance_criteria": [
+            "Article fixture 'Company reports 25% profit increase' scores ≥ 0.5 (positive)",
+            "Article fixture 'Company issues profit warning' scores ≤ -0.3 (negative)",
+            "Article fixture 'Company appoints new operations director' scores between -0.1 and 0.2 (neutral)",
+            "NSE official filing gets 1.5× weight vs general news in aggregate",
+            "Aggregate score stays within -1.0 to 1.0",
+            "is_processed=True set on all articles after scoring",
+            "Unit tests pass"
+          ],
+          "outputs": ["workers/analysis/sentiment.py", "Sentiment unit tests"]
+        },
+
+        {
+          "id": "SP-03-05",
+          "name": "Full AI Analysis Engine Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 6,
+          "completed_at": null,
+          "dependencies": ["SP-03-01", "SP-03-02", "SP-03-03", "SP-03-04"],
+          "tasks": [
+            "Implement workers/analysis/run_analysis.py — class AnalysisEngine",
+            "build_context(ticker: str) -> dict — assemble: company profile, last 4 quarters financials, technical snapshot, sentiment aggregate, last 30-day events (sorted by impact desc), current macro indicators",
+            "build_prompt(context: dict) -> str — construct structured prompt from Section 5.2 schema with JSON-only instruction",
+            "call_ai_api(prompt: str) -> dict — call claude-sonnet-4-5 with temperature=0.2, parse JSON response, validate with AnalysisResult Pydantic model",
+            "run(ticker: str) -> AnalysisResult | None — orchestrate full pipeline; return None on API failure",
+            "run_all(tickers: list[str]) — iterate all tickers, log summary at end",
+            "Skip signal generation if confidence_score < 0.5 (store result but set signal='HOLD')",
+            "Write workers/tests/integration/test_analysis_pipeline.py — mock all external calls (AI, DB), test orchestration logic"
+          ],
+          "acceptance_criteria": [
+            "run('SCOM') completes end-to-end in < 30s (mocked AI API) and returns valid AnalysisResult",
+            "Returned signal is always in ('BUY', 'HOLD', 'SELL') — never null or other string",
+            "confidence_score always between 0.0 and 1.0",
+            "key_drivers list contains exactly 1-3 items",
+            "Run with mocked AI returning invalid JSON: function returns None, does not raise exception",
+            "Run with 20 tickers: all 20 complete without aborting (individual failures are caught)",
+            "Integration tests pass"
+          ],
+          "outputs": ["workers/analysis/run_analysis.py", "Analysis pipeline integration tests"]
+        },
+
+        {
+          "id": "SP-03-06",
+          "name": "Portfolio Engine Implemented",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-03-05"],
+          "tasks": [
+            "Implement workers/portfolio/run_portfolio.py — class PortfolioEngine",
+            "get_active_buy_signals(min_confidence: float = 0.65) -> list[AnalysisResult] — query analysis_results for latest BUY signals",
+            "compute_raw_weights(signals: list) -> dict[str, float] — weight = confidence × (1 + fundamental_score/100)",
+            "apply_sector_cap(weights: dict, cap: float = 0.35) -> dict — iteratively reduce over-weight sectors",
+            "apply_stock_cap(weights: dict, cap: float = 0.20) -> dict — cap any single ticker at 20%",
+            "apply_cash_buffer(weights: dict, buffer: float = 0.10) -> dict — scale all weights to leave ≥ 10% cash",
+            "normalise_weights(weights: dict) -> dict — ensure sum = 100.00% within 0.01% tolerance",
+            "insert_allocation(allocation: PortfolioAllocation) — upsert to portfolio_allocations",
+            "Write workers/tests/unit/test_portfolio_allocation.py — all 5 test cases from Section 20.2"
+          ],
+          "acceptance_criteria": [
+            "Banking sector test case: 3 high-confidence banking stocks → sector allocation ≤ 35%",
+            "Single-stock dominance: 1 stock with 0.99 confidence → weight capped at 20%",
+            "Cash buffer always ≥ 10% of total portfolio",
+            "Total weights (holdings + cash) = 100.00% ± 0.01%",
+            "With 0 BUY signals: outputs 100% cash allocation (graceful empty case)",
+            "All 5 unit tests pass"
+          ],
+          "outputs": ["workers/portfolio/run_portfolio.py", "Portfolio allocation unit tests"]
+        },
+
+        {
+          "id": "SP-03-07",
+          "name": "Signal Evaluation Engine Implemented",
+          "status": "pending",
+          "priority": "medium",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-03-05"],
+          "tasks": [
+            "Implement workers/evaluation/evaluate_signals.py — class SignalEvaluator",
+            "get_evaluable_signals(min_age_days: int = 30) -> list — fetch signals older than min_age_days not yet evaluated",
+            "evaluate_signal(analysis_id, ticker, signal, signal_date) -> SignalEvaluation — fetch price performance for 30/60/90 days after signal_date",
+            "classify_outcome(price_change_pct: float, signal: str, threshold: float = 0.05) -> str — return SUCCESS/NEUTRAL/FAILURE",
+            "compute_aggregate_metrics() -> dict — overall accuracy, by confidence band, by sector, Sharpe ratio, max drawdown",
+            "Upsert to signal_evaluations table",
+            "Write workers/tests/unit/test_signal_evaluation.py"
+          ],
+          "acceptance_criteria": [
+            "BUY signal followed by +8% price move → outcome_60d = 'SUCCESS'",
+            "SELL signal followed by +8% price move → outcome_60d = 'FAILURE'",
+            "Price flat (< 2% move) → outcome = 'NEUTRAL' regardless of signal",
+            "Aggregate metrics computed correctly from fixture evaluation data",
+            "Unit tests pass"
+          ],
+          "outputs": ["workers/evaluation/evaluate_signals.py", "Evaluation unit tests"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-04",
+      "name": "Node.js Backend API",
+      "description": "Secure REST API with full auth, validation, rate limiting, and test coverage.",
+      "savepoints": [
+
+        {
+          "id": "SP-04-01",
+          "name": "Fastify Server Scaffolded",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-01-03"],
+          "tasks": [
+            "Initialise api/ as Node.js project: cd api && npm init -y",
+            "Install dependencies: fastify@4, @fastify/cors, @fastify/rate-limit, @supabase/supabase-js, zod, postgres, node-cache, pino",
+            "Install dev dependencies: vitest, supertest, @types/node, tsx, typescript",
+            "Create api/src/server.ts — buildApp() factory function (testable, not auto-starting)",
+            "Create api/src/index.ts — start server on PORT from env (default 3001)",
+            "Register plugins: CORS (strict allowlist), rate limit (60/min unauthenticated), pino logger",
+            "Register auth plugin: api/src/plugins/auth.ts — JWT validation using Supabase public key",
+            "Add GET /health endpoint returning DB connectivity status",
+            "Write api/src/routes/__tests__/health.test.ts — test 200 and 503 cases"
+          ],
+          "acceptance_criteria": [
+            "npm run dev starts server on port 3001 without errors",
+            "GET /health returns { status: 'healthy', timestamp: '...' } with 200",
+            "GET /health returns 503 when Supabase unreachable (mock DB failure)",
+            "Unauthorized request to any future protected route returns 401 (auth plugin registered)",
+            "CORS: request from http://evil.com returns 403; request from http://localhost:3000 returns 200",
+            "Health test passes in Vitest"
+          ],
+          "outputs": ["api/src/server.ts", "api/src/plugins/auth.ts", "api/src/routes/health.ts", "health test"]
+        },
+
+        {
+          "id": "SP-04-02",
+          "name": "All API Routes Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 8,
+          "completed_at": null,
+          "dependencies": ["SP-04-01", "SP-03-05"],
+          "tasks": [
+            "Implement GET /stocks — list companies with optional ?sector= filter; returns data + meta envelope",
+            "Implement GET /stocks/:ticker — company profile + latest close price from stock_prices",
+            "Implement GET /stocks/:ticker/prices — OHLCV data with ?from=&to=&interval= params",
+            "Implement GET /signals — latest signal per ticker with ?signal=&min_confidence=&sector= filters",
+            "Implement GET /signals/:ticker — full signal history for one ticker with ?limit= param",
+            "Implement GET /analysis/:ticker — most recent full AnalysisResult row for ticker",
+            "Implement GET /events — detected events with ?ticker=&type=&min_impact=&limit= filters",
+            "Implement GET /portfolio/latest — most recent portfolio_allocations row",
+            "Implement GET /portfolio/history — all allocations (admin role required)",
+            "Implement GET /news — news articles with ?ticker=&limit= filter",
+            "Implement GET /performance — signal evaluation aggregate metrics",
+            "Implement POST /users/preferences — save watchlist and alert preferences to user_preferences",
+            "Apply Zod schema validation to all query params and path params",
+            "Apply JWT auth guard to all routes except /health"
+          ],
+          "acceptance_criteria": [
+            "All 12 routes respond 200 with correct data shape when authenticated",
+            "All routes respond 401 when no Authorization header provided",
+            "GET /signals?signal=INVALID responds 400 with RFC 7807 error body",
+            "GET /stocks/XXXXXX responds 404 with RFC 7807 error body",
+            "SQL injection attempt in ticker param returns 400 (Zod rejects non-alpha chars)",
+            "GET /portfolio/history returns 403 for analyst role (admin-only route)",
+            "Response envelope always has: data, meta (with total/page/per_page), generated_at, request_id"
+          ],
+          "outputs": ["12 route files in api/src/routes/", "Zod schema files in api/src/schemas/"]
+        },
+
+        {
+          "id": "SP-04-03",
+          "name": "API Tests Written & Passing",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 5,
+          "completed_at": null,
+          "dependencies": ["SP-04-02"],
+          "tasks": [
+            "Write test files for all 12 routes following pattern in Section 20.3",
+            "Test: 200 success path with mock Supabase data",
+            "Test: 401 unauthenticated path for every protected route",
+            "Test: 400 invalid input (bad signal type, out-of-range confidence, non-alpha ticker)",
+            "Test: 404 not-found (unknown ticker)",
+            "Test: 403 role-restricted (analyst accessing admin route)",
+            "Test: rate limiting triggers 429 after 61 requests",
+            "Test: SQL injection in path param returns 400",
+            "Achieve ≥ 85% overall coverage on api/src/",
+            "Add node-tests job to .github/workflows/test.yml"
+          ],
+          "acceptance_criteria": [
+            "npm test runs all tests with 0 failures",
+            "Coverage report shows ≥ 85% on api/src/",
+            "Auth validation path at 100% coverage",
+            "Zod input validation at 100% coverage",
+            "Rate limiting test confirms 429 on 61st request",
+            "GitHub Actions node-tests job passes in CI"
+          ],
+          "outputs": ["Test files for all 12 routes", "Green CI for node-tests"]
+        },
+
+        {
+          "id": "SP-04-04",
+          "name": "API Deployed to Railway",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-04-03"],
+          "tasks": [
+            "Create Railway project, add Node.js service from GitHub repository path /api",
+            "Set all required environment variables in Railway dashboard (from .env.example list)",
+            "Configure Railway start command: node dist/index.js",
+            "Set build command: npm run build (tsc)",
+            "Note deployed API URL (e.g. https://nse-api.railway.app)",
+            "Verify all 12 endpoints respond correctly using curl or Insomnia against production URL",
+            "Add RAILWAY_API_URL to root .env.example and to Vercel env vars (for frontend)"
+          ],
+          "acceptance_criteria": [
+            "curl https://[railway-url]/health returns { status: 'healthy' }",
+            "curl https://[railway-url]/signals (with valid JWT) returns signals array",
+            "All 12 endpoints verified in production environment",
+            "API URL recorded and added to Vercel environment variables"
+          ],
+          "outputs": ["Deployed API URL", "Production endpoints verified"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-05",
+      "name": "Frontend Dashboard",
+      "description": "Full Next.js dashboard with all pages, components, charts, and real-time updates.",
+      "savepoints": [
+
+        {
+          "id": "SP-05-01",
+          "name": "Next.js Project Scaffolded",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-00-03"],
+          "tasks": [
+            "Create Next.js 14 app: npx create-next-app@latest frontend --typescript --tailwind --eslint --app --src-dir=no",
+            "Install dependencies: @supabase/supabase-js, @supabase/ssr, swr, zustand, lucide-react, lightweight-charts, recharts",
+            "Install shadcn/ui: npx shadcn-ui@latest init — choose theme matching design tokens",
+            "Add required shadcn components: button, card, badge, input, select, slider, table, dialog, toast, skeleton",
+            "Create frontend/lib/supabase/client.ts and server.ts with Next.js 14 SSR pattern",
+            "Create frontend/lib/api.ts — typed API client wrapping all 12 Node.js endpoints",
+            "Create frontend/middleware.ts — session refresh middleware for Supabase Auth",
+            "Configure next.config.js with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_API_URL"
+          ],
+          "acceptance_criteria": [
+            "npm run dev starts on localhost:3000 without errors",
+            "npm run build completes with 0 TypeScript errors",
+            "Supabase client connects and can execute a test SELECT query",
+            "Middleware correctly refreshes expired sessions",
+            "All 8 required shadcn components installed and importable"
+          ],
+          "outputs": ["frontend/ scaffold with all base dependencies installed"]
+        },
+
+        {
+          "id": "SP-05-02",
+          "name": "Auth Pages Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-05-01", "SP-01-04"],
+          "tasks": [
+            "Implement app/(auth)/login/page.tsx — email + password form with Supabase Auth sign in",
+            "Implement app/(auth)/register/page.tsx — email + password + confirm password form",
+            "Implement app/auth/callback/route.ts — exchange code for session after email verification",
+            "Add loading state (spinner) during auth submission",
+            "Add error display for: invalid credentials, email not confirmed, rate limited",
+            "Use copy from Section 18.4 for error messages",
+            "Implement auth guard in app/(dashboard)/layout.tsx — redirect to /login if no session",
+            "Add data-testid attributes to all auth form elements (for E2E tests in SP-07-01)",
+            "Write component tests: frontend/__tests__/auth/ covering form validation and error display"
+          ],
+          "acceptance_criteria": [
+            "Login with valid credentials redirects to /dashboard",
+            "Login with invalid credentials shows 'Invalid email or password' error",
+            "Accessing /dashboard without session redirects to /login",
+            "Register form validates email format client-side before submit",
+            "All form elements have data-testid attributes",
+            "Component tests pass"
+          ],
+          "outputs": ["Auth pages + layout guard", "Auth component tests"]
+        },
+
+        {
+          "id": "SP-05-03",
+          "name": "Core UI Components Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 6,
+          "completed_at": null,
+          "dependencies": ["SP-05-01"],
+          "tasks": [
+            "Implement components/signals/SignalBadge.tsx — BUY/HOLD/SELL with correct token colors, icon, ARIA label",
+            "Implement components/signals/ConfidenceBar.tsx — animated fill, threshold-based color, plain-language label from Section 18.5",
+            "Implement components/signals/SignalCard.tsx — full card with expand, drivers/risks, evidence summary",
+            "Implement components/shared/PriceDisplay.tsx — tabular-nums, change indicator arrow, ARIA label",
+            "Implement components/charts/PriceChart.tsx — lightweight-charts candlestick with volume, signal markers, time range selector",
+            "Implement components/events/EventCard.tsx — impact badge, event type chip, expand/collapse",
+            "Implement components/events/EventsFeed.tsx — virtualised list of EventCard, real-time Supabase subscription",
+            "Implement components/layout/Sidebar.tsx — collapsible, active route highlight, mobile-hidden",
+            "Implement components/layout/TopBar.tsx — logo, search placeholder, theme toggle, user menu",
+            "Implement components/layout/MobileNav.tsx — bottom tab bar for mobile",
+            "Implement components/shared/LoadingState.tsx — skeleton variants for SignalCard, EventCard, StockRow",
+            "Implement components/shared/EmptyState.tsx — contextual empty states from Section 17.9",
+            "Write component tests: frontend/__tests__/components/ covering SignalCard, PriceDisplay, EventCard"
+          ],
+          "acceptance_criteria": [
+            "SignalBadge BUY: green-100 background, green-700 text — verified with browser accessibility inspector (contrast ≥ 4.5:1)",
+            "SignalBadge has ARIA label: 'Signal: BUY with High Conviction'",
+            "ConfidenceBar 0.87 → label 'High Conviction' shown (no raw number displayed to user)",
+            "PriceChart renders without console errors for 90 days of OHLCV fixture data",
+            "PriceChart signal markers: BUY shows green ▲ on correct date",
+            "EventCard expands/collapses on click",
+            "Sidebar shows active route with visual highlight",
+            "Sidebar collapses to icon-only on toggle",
+            "All component tests pass"
+          ],
+          "outputs": ["All 12 core UI components", "Component test suite"]
+        },
+
+        {
+          "id": "SP-05-04",
+          "name": "Dashboard & Signals Pages Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 5,
+          "completed_at": null,
+          "dependencies": ["SP-05-03", "SP-04-02"],
+          "tasks": [
+            "Implement app/(dashboard)/dashboard/page.tsx — 4 KPI stat cards (NSE 20 index, top signal today, active events count, portfolio expected return) + SignalsFeed (top 3 BUY) + EventsFeed (last 5)",
+            "Implement app/(dashboard)/signals/page.tsx — full signals grid with filters (signal type, min confidence, sector) persisted in URL params (Section 19.3)",
+            "Implement app/(dashboard)/stocks/page.tsx — TanStack Table with columns: ticker, name, sector, price, change%, signal badge, confidence bar; sortable; searchable",
+            "Implement app/(dashboard)/stocks/[ticker]/page.tsx — PriceChart (90 days default), SignalCard, latest AnalysisResult summary, recent EventCards for ticker, NewsFeed for ticker",
+            "Wire all SWR hooks to real API endpoints (SP-04-04 deployed URL)",
+            "Add real-time Supabase subscription to dashboard for new events (Section 16.4)",
+            "Add price flash animation on real-time price update (Section 19.5)"
+          ],
+          "acceptance_criteria": [
+            "Dashboard page loads in < 2s (LCP) with real data",
+            "Signals page filter by BUY shows only BUY signals (verified in browser)",
+            "Signals filter persisted in URL: refreshing page preserves filter state",
+            "Stocks table sorts by price descending when clicking Price column header",
+            "Stock detail /stocks/SCOM renders SCOM price chart with last 90 days of data",
+            "New event inserted to Supabase appears on dashboard within 3s without page refresh"
+          ],
+          "outputs": ["Dashboard, Signals, Stocks List, Stock Detail pages"]
+        },
+
+        {
+          "id": "SP-05-05",
+          "name": "Remaining Dashboard Pages Implemented",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 6,
+          "completed_at": null,
+          "dependencies": ["SP-05-04"],
+          "tasks": [
+            "Implement app/(dashboard)/events/page.tsx — full events feed with filters: ticker, event type, min impact slider",
+            "Implement app/(dashboard)/analysis/[ticker]/page.tsx — full AnalysisResult: macro context, evidence summary, drivers list, risks list, triggering events linked to EventCards",
+            "Implement app/(dashboard)/portfolio/page.tsx — Recharts PieChart of allocation, TanStack holdings table, cash buffer indicator, rebalance trigger notice",
+            "Implement app/(dashboard)/news/page.tsx — news cards with sentiment badge (positive/neutral/negative label), ticker chip, source link",
+            "Implement app/(dashboard)/performance/page.tsx — signal accuracy chart (Recharts), accuracy by confidence band table, Sharpe ratio / max drawdown / alpha vs NSE 20 stats",
+            "Implement app/(dashboard)/reports/page.tsx — list of past email reports from email_logs, viewer component",
+            "Implement app/(dashboard)/settings/page.tsx — watchlist editor (add/remove tickers with autocomplete), email frequency toggle, alert threshold slider",
+            "Implement app/(dashboard)/admin/page.tsx (admin role only) — last run timestamps for each Python worker, error log viewer, manual trigger button (calls Railway deploy hook)"
+          ],
+          "acceptance_criteria": [
+            "All 8 pages render without console errors with real or fixture data",
+            "Portfolio pie chart renders correct percentages matching portfolio_allocations.holdings JSONB",
+            "Settings: adding SCOM to watchlist triggers optimistic update and POST /users/preferences",
+            "Settings: removing SCOM rolls back if API returns error (optimistic rollback pattern from Section 19.7)",
+            "Admin page hidden from navigation for viewer and analyst roles",
+            "Performance page shows correct accuracy % calculated from signal_evaluations data",
+            "All pages mobile responsive — tested at 375px viewport width"
+          ],
+          "outputs": ["8 remaining dashboard pages implemented and responsive"]
+        },
+
+        {
+          "id": "SP-05-06",
+          "name": "Landing Page Implemented",
+          "status": "pending",
+          "priority": "medium",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-05-01"],
+          "tasks": [
+            "Implement app/page.tsx — public landing page",
+            "Hero section: headline 'AI Research for the Nairobi Securities Exchange', subheadline, CTA buttons from Section 18.2",
+            "Trust section: data sources listed with icons",
+            "3 feature blocks with copy from Section 18.2",
+            "CTA section: 'Get Started Free' button linking to /register",
+            "Footer: platform name, version, links to /login and /register",
+            "Ensure page is accessible without auth (no redirect to login)"
+          ],
+          "acceptance_criteria": [
+            "Landing page renders at / without requiring auth",
+            "CTA 'Get Started Free' links to /register",
+            "Page passes Lighthouse accessibility score ≥ 90",
+            "All copy matches Section 18.2 specification exactly",
+            "Page renders correctly on mobile (375px) and desktop (1280px)"
+          ],
+          "outputs": ["app/page.tsx — public landing page"]
+        },
+
+        {
+          "id": "SP-05-07",
+          "name": "Accessibility Audit Passed",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-05-05", "SP-05-06"],
+          "tasks": [
+            "Run axe-core accessibility scan on all 15 pages using @axe-core/react in development mode",
+            "Fix all axe-core violations (level AA minimum)",
+            "Manually verify keyboard navigation: Tab through entire dashboard page without using mouse",
+            "Verify all icon-only buttons have aria-label",
+            "Verify all images have alt text",
+            "Verify price displays have correct aria-label (e.g. 'SCOM price: KES 24.50, up 1.2 percent')",
+            "Verify focus ring visible on all focusable elements",
+            "Verify prefers-reduced-motion: disable animations when enabled in OS settings",
+            "Verify touch targets ≥ 44×44px on mobile"
+          ],
+          "acceptance_criteria": [
+            "axe-core reports 0 violations on all 15 pages",
+            "Keyboard navigation: every interactive element reachable without mouse on dashboard page",
+            "All signal colors pass WCAG AA contrast check (4.5:1 minimum) — use WebAIM checker",
+            "prefers-reduced-motion: AnimatePresence animations disabled when OS setting active",
+            "All touch targets ≥ 44×44px verified on iPhone 12 viewport"
+          ],
+          "outputs": ["Accessibility audit report", "All axe-core violations fixed"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-06",
+      "name": "Notifications & Automation Pipeline",
+      "description": "Email system, daily pipeline cron jobs, and Railway worker deployment.",
+      "savepoints": [
+
+        {
+          "id": "SP-06-01",
+          "name": "Email Templates Built",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 4,
+          "completed_at": null,
+          "dependencies": ["SP-03-05"],
+          "tasks": [
+            "Install React Email: npm install @react-email/components @react-email/render",
+            "Create workers/notifications/templates/DailyDigest.tsx — sections: header, top BUY signals (3), top SELL signals (3), events of the day, portfolio summary, footer",
+            "Create workers/notifications/templates/EventAlert.tsx — event headline, affected company, signal change, source link, action button",
+            "Create workers/notifications/templates/WeeklyReview.tsx — portfolio allocation table, week performance summary, upcoming events",
+            "Create workers/notifications/templates/SignalChange.tsx — ticker, old signal → new signal, confidence, key drivers",
+            "Apply copy from Section 18.4 to all subject lines",
+            "Apply brand colors from design tokens to email template HTML (inline styles required for email clients)",
+            "Test email rendering: npx email preview — view in browser",
+            "Verify rendering in Gmail, Apple Mail, Outlook (use email-on-acid or similar if available)"
+          ],
+          "acceptance_criteria": [
+            "DailyDigest renders correctly in browser preview with 3 real BUY signal fixtures",
+            "EventAlert renders with correct event data from fixture",
+            "Subject lines match formula from Section 18.4",
+            "All emails mobile-responsive at 375px",
+            "No layout breakage in Gmail (common rendering quirks handled)",
+            "NSE brand colors applied correctly in email (navy header, signal color badges)"
+          ],
+          "outputs": ["4 React Email template files"]
+        },
+
+        {
+          "id": "SP-06-02",
+          "name": "Resend Integration Implemented",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-06-01"],
+          "tasks": [
+            "Create Resend account at resend.com; verify sending domain or use resend sandbox",
+            "Record RESEND_API_KEY in password manager and set as env var",
+            "Install Resend SDK: npm install resend in workers/ (or Node.js notifications script)",
+            "Implement workers/notifications/send_digest.py (or send_digest.js) — fetch today's data from Supabase, render DailyDigest template, send via Resend API",
+            "Implement send_alert() function for high-impact event alerts",
+            "Log every send to email_logs table: recipient, subject, resend_id, status, sent_at",
+            "Implement send_weekly.py for weekly portfolio review email",
+            "Test: manually trigger send_digest script and verify email received"
+          ],
+          "acceptance_criteria": [
+            "send_digest.py runs and email arrives in test inbox within 60 seconds",
+            "Email subject matches formula: 'NSE Daily: [N BUY signals], [N events] — [Date]'",
+            "Email HTML renders correctly in Gmail",
+            "Send logged to email_logs table with correct resend_id",
+            "Resend API error (invalid key) caught and logged without crashing worker",
+            "RESEND_API_KEY validated at startup (startup fails if missing)"
+          ],
+          "outputs": ["Email send scripts", "email_logs records for test sends"]
+        },
+
+        {
+          "id": "SP-06-03",
+          "name": "Railway Cron Workers Deployed",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-02-07", "SP-03-07"],
+          "tasks": [
+            "Create railway.toml in workers/ directory with cron job definitions for all 8 scheduled scripts",
+            "Cron schedules (UTC): fetch_macro='0 3 * * *', poll_prices='5-25 6-13 * * 1-5' (every 20min), fetch_news='*/30 6-14 * * 1-5', detect_events='35 13 * * 1-5', run_analysis='30 13 * * 1-5', run_portfolio='0 14 * * 1-5', evaluate_signals='30 14 * * 1-5', fetch_financials='0 20 * * *'",
+            "Deploy Python workers service to Railway from /workers directory",
+            "Set all environment variables in Railway dashboard",
+            "Monitor first scheduled execution of each script in Railway logs",
+            "Verify stock_prices table receiving new rows during NSE trading hours"
+          ],
+          "acceptance_criteria": [
+            "railway.toml valid and all 8 cron schedules active in Railway dashboard",
+            "At least one successful execution of fetch_prices.py logged in Railway",
+            "stock_prices table gaining new rows during 09:00-15:30 EAT weekdays",
+            "news_articles table gaining new rows every 30 minutes",
+            "All worker environment variables set (verify with: railway variables --service workers)",
+            "No ERROR logs in Railway within first 24 hours of operation"
+          ],
+          "outputs": ["workers/railway.toml", "Workers deployed and active on Railway"]
+        },
+
+        {
+          "id": "SP-06-04",
+          "name": "GitHub Actions Email Pipeline Active",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 1,
+          "completed_at": null,
+          "dependencies": ["SP-06-02", "SP-00-04"],
+          "tasks": [
+            "Set GitHub repository secrets: RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL",
+            "Update daily-digest.yml workflow to run workers/notifications/send_digest.py with correct Python setup",
+            "Update weekly-review.yml to run send_weekly.py",
+            "Manually trigger daily-digest.yml: Actions > Run workflow — verify execution",
+            "Verify email received from manual trigger",
+            "Verify email_logs table updated after manual trigger"
+          ],
+          "acceptance_criteria": [
+            "Manual workflow trigger completes with exit code 0",
+            "Email received in test inbox following manual trigger",
+            "email_logs table shows new row with status='sent' after trigger",
+            "daily-digest.yml scheduled trigger fires at 15:30 UTC on first weekday after setup"
+          ],
+          "outputs": ["Active GitHub Actions email workflows", "First automated email delivered"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-07",
+      "name": "QA, Testing & Security Hardening",
+      "description": "Full E2E test suite, security audit, performance testing, and accessibility verification.",
+      "savepoints": [
+
+        {
+          "id": "SP-07-01",
+          "name": "E2E Test Suite Implemented",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 8,
+          "completed_at": null,
+          "dependencies": ["SP-05-05", "SP-04-04"],
+          "tasks": [
+            "Install Playwright: cd frontend && npx playwright install --with-deps",
+            "Configure playwright.config.ts with baseURL, test timeout 30s, 3 browsers (chromium, firefox, webkit)",
+            "Implement e2e/tests/auth.spec.ts — 4 test cases from Section 20.5: redirect, invalid credentials, login success, logout",
+            "Implement e2e/tests/signals.spec.ts — filter by type, navigate to analysis detail, empty state",
+            "Implement e2e/tests/stocks.spec.ts — navigate to stock list, search for SCOM, navigate to SCOM detail",
+            "Implement e2e/tests/portfolio.spec.ts — portfolio page loads, allocation chart renders",
+            "Implement e2e/tests/events.spec.ts — events feed loads, filter by impact",
+            "Implement e2e/tests/settings.spec.ts — add ticker to watchlist, verify persistence after page refresh",
+            "Create e2e/.env with TEST_USER_EMAIL and TEST_USER_PASSWORD for test account",
+            "Add e2e-tests job to .github/workflows/test.yml"
+          ],
+          "acceptance_criteria": [
+            "All 25 E2E test cases pass in chromium",
+            "All tests pass in firefox and webkit (cross-browser)",
+            "Test run completes in < 5 minutes",
+            "Failed test artifacts (screenshots + video) uploaded to GitHub Actions on failure",
+            "No hardcoded credentials in E2E test files (all from .env)",
+            "GitHub Actions e2e-tests job passes"
+          ],
+          "outputs": ["e2e/tests/ directory (7 test files)", "Playwright configured in CI"]
+        },
+
+        {
+          "id": "SP-07-02",
+          "name": "Security Hardening Checklist Completed",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 4,
+          "completed_at": null,
+          "dependencies": ["SP-05-07", "SP-04-04"],
+          "tasks": [
+            "Verify all HTTP security headers from Section 21.5 are set — use securityheaders.com scanner",
+            "Verify CSP blocks inline scripts (test by adding <script>alert(1)</script> to dev console)",
+            "Run TruffleHog on full commit history: trufflehog git file://. — verify 0 secrets found",
+            "Run npm audit on api/ and frontend/ — no high or critical vulnerabilities",
+            "Run pip-audit on workers/ — no high or critical vulnerabilities",
+            "Verify all RLS policies from SP-01-03 still enforced after all schema changes",
+            "Test rate limiting at API level: 61 requests → 429 response",
+            "Test CORS: request from non-allowlisted origin returns 403",
+            "Test SQL injection in ticker param: ensure 400 returned not 500",
+            "Verify access tokens stored in memory only (not localStorage — check browser dev tools)",
+            "Verify refresh tokens in httpOnly cookie (not accessible via document.cookie)",
+            "Complete OWASP Top 10 checklist from Section 21.9 — document each item"
+          ],
+          "acceptance_criteria": [
+            "securityheaders.com scan returns grade A or A+",
+            "TruffleHog finds 0 secrets in commit history",
+            "npm audit reports 0 high/critical vulnerabilities in api/ and frontend/",
+            "pip-audit reports 0 high/critical vulnerabilities",
+            "All 10 OWASP Top 10 items in Section 21.9 verified and documented",
+            "Security hardening checklist committed to docs/security-audit.md"
+          ],
+          "outputs": ["docs/security-audit.md", "Security scan reports"]
+        },
+
+        {
+          "id": "SP-07-03",
+          "name": "Performance Testing Completed",
+          "status": "pending",
+          "priority": "medium",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-04-04"],
+          "tasks": [
+            "Install k6: brew install k6 (or equivalent)",
+            "Write load-test.js following pattern in Section 20.8",
+            "Run load test against deployed Railway API URL",
+            "Verify all endpoints meet latency targets from Section 20.8 performance targets table",
+            "Run Lighthouse performance audit on /dashboard page — target LCP < 2.5s, FCP < 1.5s, CLS < 0.1",
+            "Profile any endpoints failing latency targets — add caching if needed (Section 16.5)",
+            "Document results in docs/performance-test-results.md"
+          ],
+          "acceptance_criteria": [
+            "GET /signals: P95 < 300ms at 10 concurrent users",
+            "GET /stocks/:ticker: P95 < 200ms at 10 concurrent users",
+            "GET /health: P95 < 50ms at 10 concurrent users",
+            "k6 error rate < 1% across all endpoints",
+            "Lighthouse /dashboard: LCP < 2.5s, Performance score ≥ 80",
+            "Results documented in docs/performance-test-results.md"
+          ],
+          "outputs": ["load-test.js", "docs/performance-test-results.md"]
+        },
+
+        {
+          "id": "SP-07-04",
+          "name": "Full Test Suite Green in CI",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-07-01", "SP-07-02", "SP-07-03", "SP-02-07", "SP-04-03"],
+          "tasks": [
+            "Merge all test coverage into a single CI run: test.yml runs python-tests, node-tests, e2e-tests in sequence",
+            "Verify all three jobs pass on main branch",
+            "Set up Codecov integration: add CODECOV_TOKEN secret, update workflows to upload coverage",
+            "Verify coverage thresholds enforced: fail CI if Python workers < 80%, API < 85%, Frontend < 70%",
+            "Add test status badge to README",
+            "Document total test count and coverage in README"
+          ],
+          "acceptance_criteria": [
+            "Push to main triggers test.yml and all 3 jobs pass (green)",
+            "Codecov dashboard shows coverage breakdown by service",
+            "Coverage thresholds enforced: CI fails if coverage drops below minimums",
+            "README shows green test badges for all 3 test jobs",
+            "Total test count ≥ 100 tests across all services"
+          ],
+          "outputs": ["Fully green CI pipeline", "Codecov dashboard", "README test badges"]
+        }
+      ]
+    },
+
+    {
+      "phase_id": "PH-08",
+      "name": "Production Deployment",
+      "description": "Deploy all services to production, configure monitoring, and complete the launch checklist.",
+      "savepoints": [
+
+        {
+          "id": "SP-08-01",
+          "name": "Frontend Deployed to Vercel",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-05-07", "SP-04-04"],
+          "tasks": [
+            "Import frontend/ GitHub repository path into Vercel",
+            "Set all NEXT_PUBLIC_* environment variables in Vercel dashboard (SUPABASE_URL, SUPABASE_ANON_KEY, API_URL)",
+            "Deploy — verify Vercel build completes with 0 errors",
+            "Configure custom domain if available (optional)",
+            "Update Supabase Auth Redirect URL with production Vercel domain",
+            "Update CORS allowlist in Railway API with production Vercel domain",
+            "Verify production login flow end-to-end"
+          ],
+          "acceptance_criteria": [
+            "Vercel deployment succeeds with green build status",
+            "Production URL loads landing page without errors",
+            "Login on production URL redirects correctly to /dashboard",
+            "No CORS errors in browser console on production",
+            "Supabase Auth redirect URL updated to production domain"
+          ],
+          "outputs": ["Production Vercel URL"]
+        },
+
+        {
+          "id": "SP-08-02",
+          "name": "Monitoring & Alerting Configured",
+          "status": "pending",
+          "priority": "high",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-08-01", "SP-06-03"],
+          "tasks": [
+            "Create UptimeRobot (free tier) monitors: API /health endpoint every 5 min, Frontend root URL every 5 min",
+            "Configure UptimeRobot alert: email notification on 2 consecutive failures",
+            "Set Supabase auth alerts: email on > 10 failed login attempts in 1 hour",
+            "Add Railway webhook notification on worker job failures",
+            "Create runbooks/incidents.md documenting P1-P4 response plan from Section 21.10"
+          ],
+          "acceptance_criteria": [
+            "UptimeRobot monitors active and showing UP for both endpoints",
+            "Test alert: manually stop Railway worker, verify email notification received within 10 min",
+            "runbooks/incidents.md committed to repository",
+            "Supabase auth alerts configured"
+          ],
+          "outputs": ["Monitoring active", "runbooks/incidents.md"]
+        },
+
+        {
+          "id": "SP-08-03",
+          "name": "Production Data Backfill Complete",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 3,
+          "completed_at": null,
+          "dependencies": ["SP-08-01"],
+          "tasks": [
+            "Run backfill script: python workers/data/fetch_prices.py --mode historical --days 365 --tickers all",
+            "Verify ≥ 200 price rows per ticker in stock_prices table",
+            "Verify financials table has ≥ 3 years of data for all 5 priority tickers",
+            "Run initial news backfill: fetch last 30 days of news for all tickers",
+            "Run initial analysis pipeline: python workers/analysis/run_analysis.py --all",
+            "Verify analysis_results table has at least one result per active ticker",
+            "Run initial portfolio: python workers/portfolio/run_portfolio.py",
+            "Verify portfolio_allocations has one current allocation"
+          ],
+          "acceptance_criteria": [
+            "SELECT COUNT(*) FROM stock_prices WHERE ticker='SCOM' returns ≥ 200",
+            "SELECT * FROM analysis_results ORDER BY generated_at DESC LIMIT 5 shows valid recent results",
+            "SELECT * FROM portfolio_allocations ORDER BY created_at DESC LIMIT 1 shows valid allocation",
+            "Dashboard page loads with real data (not empty states)",
+            "At least 3 BUY or SELL signals visible on /signals page"
+          ],
+          "outputs": ["Production database fully populated with historical data"]
+        },
+
+        {
+          "id": "SP-08-04",
+          "name": "Launch Checklist Completed",
+          "status": "pending",
+          "priority": "critical",
+          "estimated_hours": 2,
+          "completed_at": null,
+          "dependencies": ["SP-08-01", "SP-08-02", "SP-08-03", "SP-07-04"],
+          "tasks": [
+            "Re-run securityheaders.com scan on production URL — verify grade A",
+            "Re-run axe-core audit on production URL — 0 violations",
+            "Verify daily digest email sent at 15:30 UTC (18:30 EAT) on production",
+            "Verify NSE cron jobs firing on schedule (check Railway logs)",
+            "Verify all 15 pages load in < 3s on production (Lighthouse)",
+            "Update README with production URL, architecture diagram link, and setup instructions",
+            "Tag v1.0.0 release on GitHub",
+            "Complete docs/launch-checklist.md and commit to repository"
+          ],
+          "acceptance_criteria": [
+            "securityheaders.com scan of production URL returns A or A+",
+            "axe-core on production /dashboard — 0 violations",
+            "First automated daily digest email received by admin inbox",
+            "NSE cron job logs show successful execution on first trading day post-launch",
+            "All 15 pages pass Lighthouse performance ≥ 80, accessibility ≥ 90",
+            "GitHub v1.0.0 tag exists",
+            "docs/launch-checklist.md committed and all items checked"
+          ],
+          "outputs": ["v1.0.0 GitHub release tag", "docs/launch-checklist.md — all items complete"]
+        }
+      ]
+    }
+
+  ],
+
+  "summary": {
+    "total_phases": 9,
+    "total_savepoints": 38,
+    "estimated_total_hours": 147,
+    "critical_path": [
+      "SP-00-01 → SP-01-01 → SP-01-02 → SP-01-03 → SP-01-04",
+      "SP-00-01 → SP-02-01 → SP-02-02 → SP-02-03 → SP-03-01 → SP-03-05",
+      "SP-03-05 → SP-04-01 → SP-04-02 → SP-04-03 → SP-04-04",
+      "SP-04-04 → SP-05-01 → SP-05-02 → SP-05-03 → SP-05-04 → SP-05-05 → SP-07-01 → SP-08-01 → SP-08-04"
+    ],
+    "phases_by_status": {
+      "pending": 9,
+      "in_progress": 0,
+      "complete": 0,
+      "blocked": 0
+    },
+    "completion_percentage": 0
+  }
+}
