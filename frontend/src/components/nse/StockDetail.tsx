@@ -1,0 +1,133 @@
+import React, { useState } from "react";
+import { motion } from "motion/react";
+import { X, TrendingUp, TrendingDown, BarChart2 } from "lucide-react";
+import type { NSEStock } from "../../data/nseData";
+import { formatVolume } from "../../data/nseData";
+import StockChart from "./StockChart";
+import AIAnalysis from "./AIAnalysis";
+
+interface Props {
+  stock: NSEStock;
+  onClose: () => void;
+}
+
+type Range = "1M" | "2M" | "3M";
+
+const RANGE_DAYS: Record<Range, number> = { "1M": 22, "2M": 44, "3M": 66 };
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-mono text-gray-500">{label}</span>
+      <span className="text-sm font-semibold text-white tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+export default function StockDetail({ stock, onClose }: Props) {
+  const [range, setRange] = useState<Range>("3M");
+  const isUp = stock.changePercent >= 0;
+
+  const displayHistory = stock.history.slice(-RANGE_DAYS[range]);
+  const rangeReturn =
+    displayHistory.length > 1
+      ? (
+          ((displayHistory[displayHistory.length - 1].close - displayHistory[0].close) /
+            displayHistory[0].close) *
+          100
+        ).toFixed(2)
+      : "0.00";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 40 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 40 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col gap-5 h-full overflow-y-auto no-scrollbar"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+              {stock.symbol}
+            </span>
+            <span className="text-xs text-gray-500 font-mono">{stock.sector}</span>
+          </div>
+          <h2 className="text-xl font-bold text-white leading-tight">{stock.name}</h2>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Price hero */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="flex items-end justify-between mb-1">
+          <span className="text-3xl font-bold text-white tabular-nums">
+            KES {stock.price.toFixed(2)}
+          </span>
+          <span
+            className={`flex items-center gap-1 text-sm font-mono font-semibold ${
+              isUp ? "text-emerald-400" : "text-red-400"
+            }`}
+          >
+            {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            {isUp ? "+" : ""}
+            {stock.change.toFixed(2)} ({isUp ? "+" : ""}
+            {stock.changePercent.toFixed(2)}%)
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 font-mono mb-4">
+          {range} return:{" "}
+          <span className={Number(rangeReturn) >= 0 ? "text-emerald-400" : "text-red-400"}>
+            {Number(rangeReturn) >= 0 ? "+" : ""}
+            {rangeReturn}%
+          </span>
+        </p>
+
+        {/* Range selector */}
+        <div className="flex gap-2 mb-3">
+          {(["1M", "2M", "3M"] as Range[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`text-xs font-mono px-3 py-1 rounded-lg transition-all ${
+                range === r
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "text-gray-500 hover:text-gray-300 border border-transparent"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        <StockChart history={displayHistory} height={140} showAxes />
+      </div>
+
+      {/* Key stats grid */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart2 size={14} className="text-gray-500" />
+          <span className="text-xs font-mono text-gray-500 uppercase tracking-widest">Key Statistics</span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+          <Stat label="Market Cap" value={`KES ${stock.marketCap}B`} />
+          <Stat label="Volume" value={formatVolume(stock.volume)} />
+          <Stat label="52W High" value={`KES ${stock.high52w}`} />
+          <Stat label="52W Low" value={`KES ${stock.low52w}`} />
+          <Stat label="P/E Ratio" value={stock.peRatio?.toFixed(1) ?? "—"} />
+          <Stat label="Div. Yield" value={stock.dividendYield ? `${stock.dividendYield}%` : "—"} />
+        </div>
+      </div>
+
+      {/* AI Analysis */}
+      <AIAnalysis stock={stock} />
+    </motion.div>
+  );
+}

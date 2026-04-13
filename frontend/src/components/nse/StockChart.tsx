@@ -1,0 +1,74 @@
+import React, { useMemo } from "react";
+import type { PricePoint } from "../../data/nseData";
+
+interface Props {
+  history: PricePoint[];
+  height?: number;
+  showAxes?: boolean;
+}
+
+export default function StockChart({ history, height = 120, showAxes = false }: Props) {
+  const points = history.slice(-60);
+
+  const { min, max, svgPoints, areaPoints } = useMemo(() => {
+    if (points.length === 0) return { min: 0, max: 0, svgPoints: "", areaPoints: "" };
+
+    const closes = points.map((p) => p.close);
+    const minVal = Math.min(...closes);
+    const maxVal = Math.max(...closes);
+    const range = maxVal - minVal || 1;
+
+    const w = 600;
+    const h = height;
+    const pad = showAxes ? 8 : 0;
+
+    const coords = closes.map((c, i) => {
+      const x = pad + (i / (closes.length - 1)) * (w - pad * 2);
+      const y = h - pad - ((c - minVal) / range) * (h - pad * 2);
+      return [x, y] as [number, number];
+    });
+
+    const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const area =
+      line +
+      ` L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`;
+
+    return { min: minVal, max: maxVal, svgPoints: line, areaPoints: area };
+  }, [points, height, showAxes]);
+
+  const isUp = points.length >= 2 && points[points.length - 1].close >= points[0].close;
+  const color = isUp ? "#34d399" : "#f87171";
+  const gradId = `grad-${Math.random().toString(36).slice(2, 7)}`;
+
+  return (
+    <svg
+      viewBox={`0 0 600 ${height}`}
+      className="w-full"
+      style={{ height }}
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {areaPoints && (
+        <path d={areaPoints} fill={`url(#${gradId})`} />
+      )}
+      {svgPoints && (
+        <path d={svgPoints} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      )}
+      {showAxes && (
+        <>
+          <text x="4" y="12" fill="#6b7280" fontSize="10" fontFamily="monospace">
+            {max.toFixed(2)}
+          </text>
+          <text x="4" y={height - 4} fill="#6b7280" fontSize="10" fontFamily="monospace">
+            {min.toFixed(2)}
+          </text>
+        </>
+      )}
+    </svg>
+  );
+}
