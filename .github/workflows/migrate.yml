@@ -1,41 +1,36 @@
 name: Apply Database Migrations
 
 on:
-  workflow_dispatch:   # run manually from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   migrate:
     name: Push migrations to Supabase (nse schema)
     runs-on: ubuntu-latest
+    env:
+      PGHOST:     ${{ secrets.PGHOST }}
+      PGUSER:     ${{ secrets.PGUSER }}
+      PGDATABASE: ${{ secrets.PGDATABASE }}
+      PGPASSWORD: ${{ secrets.PGPASSWORD }}
+      PGSSLMODE:  require
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Install psql client
+        run: sudo apt-get install -y postgresql-client
 
-      - name: Install Supabase CLI
-        run: npm install -g supabase
-
-      - name: Apply migrations via direct DB URL
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Apply migrations
         run: |
           for f in supabase/migrations/*.sql; do
-            echo "▶ Applying $f"
-            PGPASSWORD=$(echo $DATABASE_URL | sed 's/.*:\(.*\)@.*/\1/' | python3 -c "import sys, urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))") \
-            psql "$DATABASE_URL" -f "$f"
+            echo "▶ Applying $f ..."
+            psql -v ON_ERROR_STOP=1 -f "$f"
             echo "✅ Done: $f"
           done
 
-      - name: Verify nse schema tables exist
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Verify nse schema tables
         run: |
-          psql "$DATABASE_URL" -c "
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = 'nse'
-            ORDER BY table_name;
+          psql -c "
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'nse' ORDER BY table_name;
           "
