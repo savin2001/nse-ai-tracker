@@ -7,12 +7,6 @@ jobs:
   migrate:
     name: Push migrations to Supabase (nse schema)
     runs-on: ubuntu-latest
-    env:
-      PGHOST:     ${{ secrets.PGHOST }}
-      PGUSER:     ${{ secrets.PGUSER }}
-      PGDATABASE: ${{ secrets.PGDATABASE }}
-      PGPASSWORD: ${{ secrets.PGPASSWORD }}
-      PGSSLMODE:  require
 
     steps:
       - uses: actions/checkout@v4
@@ -20,17 +14,29 @@ jobs:
       - name: Install psql client
         run: sudo apt-get install -y postgresql-client
 
-      - name: Apply migrations
+      - name: Test DB connection
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
         run: |
+          psql \
+            "host=${{ secrets.PGHOST }} port=5432 dbname=${{ secrets.PGDATABASE }} user=${{ secrets.PGUSER }} sslmode=require" \
+            -c "SELECT current_database(), current_user, version();"
+
+      - name: Apply migrations
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+        run: |
+          CONN="host=${{ secrets.PGHOST }} port=5432 dbname=${{ secrets.PGDATABASE }} user=${{ secrets.PGUSER }} sslmode=require"
           for f in supabase/migrations/*.sql; do
             echo "▶ Applying $f ..."
-            psql -v ON_ERROR_STOP=1 -f "$f"
+            psql "$CONN" -v ON_ERROR_STOP=1 -f "$f"
             echo "✅ Done: $f"
           done
 
       - name: Verify nse schema tables
+        env:
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
         run: |
-          psql -c "
-            SELECT table_name FROM information_schema.tables
-            WHERE table_schema = 'nse' ORDER BY table_name;
-          "
+          psql \
+            "host=${{ secrets.PGHOST }} port=5432 dbname=${{ secrets.PGDATABASE }} user=${{ secrets.PGUSER }} sslmode=require" \
+            -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'nse' ORDER BY table_name;"
