@@ -11,32 +11,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install psql client
-        run: sudo apt-get install -y postgresql-client
-
-      - name: Test DB connection
+      - name: Run migrations via Supabase Management API
         env:
-          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF:  ${{ vars.SUPABASE_PROJECT_REF }}
         run: |
-          psql \
-            "host=${{ secrets.PGHOST }} port=5432 dbname=${{ secrets.PGDATABASE }} user=${{ secrets.PGUSER }} sslmode=require" \
-            -c "SELECT current_database(), current_user, version();"
+          python3 << 'PYEOF'
+          import os, glob, requests, json, sys
 
-      - name: Apply migrations
-        env:
-          PGPASSWORD: ${{ secrets.PGPASSWORD }}
-        run: |
-          CONN="host=${{ secrets.PGHOST }} port=5432 dbname=${{ secrets.PGDATABASE }} user=${{ secrets.PGUSER }} sslmode=require"
-          for f in supabase/migrations/*.sql; do
-            echo "▶ Applying $f ..."
-            psql "$CONN" -v ON_ERROR_STOP=1 -f "$f"
-            echo "✅ Done: $f"
-          done
+          TOKEN = os.environ["SUPABASE_ACCESS_TOKEN"]
+          REF   = os.environ["SUPABASE_PROJECT_REF"]
+          URL   = f"https://api.supabase.com/v1/projects/{REF}/database/query"
+          HEADERS = {
+              "Authorization": f"Bearer {TOKEN}",
+              "Content-Type": "application/json"
+          }
 
-      - name: Verify nse schema tables
-        env:
-          PGPASSWORD: ${{ secrets.PGPASSWORD }}
-        run: |
-          psql \
-            "host=${{ secrets.PGHOST }} port=5432 dbname=${{ secrets.PGDATABASE }} user=${{ secrets.PGUSER }} sslmode=require" \
-            -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'nse' ORDER BY table_name;"
+          # Test connection
+          r = requests.post(URL, headers=HEADERS, json={"query": "SELECT current_database(), current_user;"})
+          if r.status_code != 200:
+              print(f"❌ Connection failed: {r.status_code} {r.text}")
+              sys.exit(1)
+          print(f"✅ Connected: {r.json()}")
+
+          # Apply each migration in order
+          migration_files = sorted(glob.glob("supabase/migrations/*.sql"))
+          for filepath in migration_files:
+              print(f"\n▶ Applying {filepath} ...")
+              with open(filepath, "r") as f:
+                  sql = f.read()
+
+              r = requests.post(URL, headers=HEADERS, json={"query": sql})
+              if r.status_code == 200:
+                  print(f"✅ Done: {filepath}")
+              else:
+                  print(f"❌ Failed: {filepath}")
+                  print(f"   Status: {r.status_code}")
+                  print(f"   Response: {r.text}")
+                  sys.exit(1)
+
+          # Verify tables created
+          print("\n📋 Verifying nse schema tables...")
+          r = requests.post(URL, headers=HEADERS, json={
+              "query": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'nse' ORDER BY table_name;"
+          })
+          if r.status_code == 200:
+              tables = [row["table_name"] for row in r.json()]
+              print(f"✅ Tables created: {tables}")
+          else:
+              print(f"❌ Verification failed: {r.text}")
+              sys.exit(1)
+          PYEOF
