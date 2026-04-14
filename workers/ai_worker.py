@@ -5,11 +5,14 @@ Generates BUY/HOLD/SELL signals for each NSE ticker using Claude.
 Schedule: 18:00 EAT (Mon-Fri), after market close
 """
 import json
-import structlog
 from datetime import date, timedelta
+
+import structlog
 from dotenv import load_dotenv
-from services.db import get_db
+
+from models.analysis import AnalysisResult
 from services.ai import get_ai
+from services.db import get_db, nse
 
 load_dotenv()
 log = structlog.get_logger()
@@ -41,15 +44,16 @@ Respond in this exact JSON (no markdown):
 def run():
     db = get_db()
     ai = get_ai()
+    schema = nse(db)
 
-    companies = db.table("companies").select("*").execute().data
+    companies = schema.table("companies").select("*").execute().data
     cutoff = str(date.today() - timedelta(days=35))
 
     for co in companies:
         ticker = co["ticker"]
         try:
             prices = (
-                db.table("stock_prices")
+                schema.table("stock_prices")
                 .select("close, volume, date")
                 .eq("ticker", ticker)
                 .gte("date", cutoff)
@@ -83,22 +87,10 @@ def run():
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = msg.content[0].text.strip()
-            result = json.loads(raw)
+            result = AnalysisResult(ticker=ticker, **json.loads(raw))
 
-            db.table("analysis_results").insert({
-                "ticker":        ticker,
-                "signal":        result["signal"],
-                "confidence":    result["confidence"],
-                "summary":       result["summary"],
-                "key_factors":   result["key_factors"],
-                "risks":         result["risks"],
-                "target_price":  result["target_price"],
-                "time_horizon":  result["time_horizon"],
-                "raw_context":   {"prices_used": len(prices)},
-                "generated_at":  "now()",
-            }).execute()
-
-            log.info("signal_generated", ticker=ticker, signal=result["signal"])
+            schema.table("analysis_results").insert(result.to_db_row()).execute()
+            log.info("signal_generated", ticker=ticker, signal=result.signal)
 
         except Exception as exc:
             log.error("signal_failed", ticker=ticker, error=str(exc))

@@ -11,3 +11,8 @@ def get_db() -> Client:
             "Missing required env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY"
         )
     return create_client(url, key)
+
+
+def nse(db: Client):
+    """Return a query builder scoped to the nse schema."""
+    return db.schema("nse")

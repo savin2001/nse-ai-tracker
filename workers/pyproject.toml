@@ -1,0 +1,8 @@
+# workers/pyproject.toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "conftest.py"]
