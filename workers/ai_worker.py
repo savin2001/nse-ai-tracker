@@ -1,15 +1,20 @@
 """
-NSE AI Worker
-Generates BUY/HOLD/SELL signals for each NSE ticker using Claude.
+NSE AI Analysis Worker
+Combines technical, fundamental, and sentiment analysis into an
+enriched prompt for Claude and generates BUY/HOLD/SELL signals.
 
 Schedule: 18:00 EAT (Mon-Fri), after market close
 """
 import json
 from datetime import date, timedelta
 
+import pandas as pd
 import structlog
 from dotenv import load_dotenv
 
+from analysis.fundamental import FundamentalAnalysis
+from analysis.sentiment import SentimentAnalysis
+from analysis.technical import TechnicalAnalysis
 from models.analysis import AnalysisResult
 from services.ai import get_ai
 from services.db import get_db, nse
@@ -17,68 +22,123 @@ from services.db import get_db, nse
 load_dotenv()
 log = structlog.get_logger()
 
-SIGNAL_PROMPT = """You are a financial analyst specialising in the Nairobi Securities Exchange.
-Analyse the following stock data and generate an investment signal.
+SIGNAL_PROMPT = """You are a senior financial analyst specialising in the Nairobi Securities Exchange (NSE).
+You have been provided with pre-computed technical, fundamental, and sentiment analysis for a stock.
+Use this data to generate a final consolidated investment signal.
 
-Ticker: {ticker}
+## Stock
+Ticker:  {ticker}
 Company: {name}
-Sector: {sector}
-Current Price: KES {price}
-30-day Change: {change_30d}%
-52W High: KES {high_52w}
-52W Low: KES {low_52w}
-Avg Daily Volume: {avg_volume}
+Sector:  {sector}
 
-Respond in this exact JSON (no markdown):
+## Technical Analysis
+Signal: {tech_signal} (score: {tech_score})
+{tech_reasons}
+Indicators: {tech_indicators}
+
+## Fundamental Analysis
+Signal: {fund_signal} (score: {fund_score})
+{fund_reasons}
+Metrics: {fund_metrics}
+
+## Sentiment Analysis
+Signal: {sent_signal} (score: {sent_score})
+{sent_reasons}
+Articles analysed: {sent_count}
+
+## Current Price Data
+Current Close: KES {close}
+SMA-20: {sma_20}
+RSI-14: {rsi}
+
+Generate your consolidated signal. Respond ONLY with valid JSON (no markdown):
 {{
   "signal": "BUY" | "HOLD" | "SELL",
   "confidence": <integer 0-100>,
-  "summary": "<2-3 sentence rationale>",
+  "summary": "<2-3 sentence rationale integrating all three analyses>",
   "key_factors": ["<factor 1>", "<factor 2>", "<factor 3>"],
   "risks": ["<risk 1>", "<risk 2>"],
-  "target_price": <number>,
+  "target_price": <number or null>,
   "time_horizon": "<e.g. 3-6 months>"
 }}"""
 
 
 def run():
-    db = get_db()
-    ai = get_ai()
+    db  = get_db()
+    ai  = get_ai()
     schema = nse(db)
 
     companies = schema.table("companies").select("*").execute().data
-    cutoff = str(date.today() - timedelta(days=35))
+    cutoff_35 = str(date.today() - timedelta(days=35))
+    cutoff_7  = str(date.today() - timedelta(days=7))
 
     for co in companies:
         ticker = co["ticker"]
         try:
-            prices = (
+            # ── Fetch raw data ────────────────────────────────────────────
+            price_rows = (
                 schema.table("stock_prices")
-                .select("close, volume, date")
+                .select("date, open, high, low, close, volume")
                 .eq("ticker", ticker)
-                .gte("date", cutoff)
-                .order("date", desc=True)
+                .gte("date", cutoff_35)
+                .order("date", desc=False)
                 .execute()
                 .data
             )
-            if len(prices) < 5:
-                log.warning("insufficient_data", ticker=ticker)
+            if len(price_rows) < 5:
+                log.warning("insufficient_prices", ticker=ticker)
                 continue
 
-            current = prices[0]["close"]
-            oldest  = prices[-1]["close"]
-            change_30d = round((current - oldest) / oldest * 100, 2) if oldest else 0
-            avg_vol = int(sum(p["volume"] for p in prices) / len(prices))
+            financials = (
+                schema.table("financials")
+                .select("*")
+                .eq("ticker", ticker)
+                .order("period_end", desc=True)
+                .limit(6)
+                .execute()
+                .data
+            )
+
+            articles = (
+                schema.table("news_articles")
+                .select("headline, sentiment, published_at")
+                .eq("ticker", ticker)
+                .gte("published_at", cutoff_7)
+                .execute()
+                .data
+            )
+
+            # ── Run analysis engines ──────────────────────────────────────
+            df = pd.DataFrame(price_rows)
+            for col in ("open", "high", "low", "close"):
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            df["volume"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0).astype(int)
+
+            tech  = TechnicalAnalysis(df).analyse()
+            fund  = FundamentalAnalysis(financials, current_price=df.iloc[-1]["close"]).analyse()
+            sent  = SentimentAnalysis(articles).analyse()
+
+            last = df.iloc[-1]
 
             prompt = SIGNAL_PROMPT.format(
                 ticker=ticker,
                 name=co.get("name", ticker),
                 sector=co.get("sector", "Unknown"),
-                price=current,
-                change_30d=change_30d,
-                high_52w=co.get("high_52w", "N/A"),
-                low_52w=co.get("low_52w", "N/A"),
-                avg_volume=avg_vol,
+                tech_signal=tech.signal,
+                tech_score=tech.score,
+                tech_reasons="\n".join(f"- {r}" for r in tech.reasons) or "- N/A",
+                tech_indicators=json.dumps(tech.indicators),
+                fund_signal=fund.signal,
+                fund_score=fund.score,
+                fund_reasons="\n".join(f"- {r}" for r in fund.reasons) or "- N/A",
+                fund_metrics=json.dumps(fund.metrics),
+                sent_signal=sent.signal,
+                sent_score=sent.score,
+                sent_reasons="\n".join(f"- {r}" for r in sent.reasons) or "- N/A",
+                sent_count=sent.article_count,
+                close=round(float(last["close"]), 2),
+                sma_20=tech.indicators.get("sma_20", "N/A"),
+                rsi=tech.indicators.get("rsi", "N/A"),
             )
 
             msg = ai.messages.create(
@@ -86,11 +146,20 @@ def run():
                 max_tokens=512,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = msg.content[0].text.strip()
-            result = AnalysisResult(ticker=ticker, **json.loads(raw))
+            raw    = msg.content[0].text.strip()
+            parsed = json.loads(raw)
+            result = AnalysisResult(ticker=ticker, **parsed)
 
-            schema.table("analysis_results").insert(result.to_db_row()).execute()
-            log.info("signal_generated", ticker=ticker, signal=result.signal)
+            row = result.to_db_row()
+            row["raw_context"] = {
+                "technical":   {"signal": tech.signal, "score": tech.score, "indicators": tech.indicators},
+                "fundamental": {"signal": fund.signal, "score": fund.score, "metrics": fund.metrics},
+                "sentiment":   {"signal": sent.signal, "score": sent.score, "articles": sent.article_count},
+            }
+
+            schema.table("analysis_results").insert(row).execute()
+            log.info("signal_generated", ticker=ticker,
+                     signal=result.signal, confidence=result.confidence)
 
         except Exception as exc:
             log.error("signal_failed", ticker=ticker, error=str(exc))
