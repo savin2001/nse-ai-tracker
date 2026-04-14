@@ -32,6 +32,9 @@ def run_query(sql: str) -> dict:
         headers={
             "Authorization": f"Bearer {TOKEN}",
             "Content-Type":  "application/json",
+            "Accept":        "application/json",
+            "User-Agent":    "supabase-cli/1.168.0",
+            "X-Client-Info": "supabase-cli/1.168.0",
         },
         method="POST",
     )
