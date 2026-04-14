@@ -3,7 +3,7 @@
   "version": "2.0",
   "schema_version": "1.0",
   "description": "Granular save points for the full planning and construction lifecycle. Each save point must be completed and verified before dependents begin. Status: pending | in_progress | complete | blocked.",
-  "last_updated": "2026-04-14T06:57:14Z",
+  "last_updated": "2026-04-14T07:06:00Z",
   "legend": {
     "priority": {
       "critical": "Blocks all downstream work. Must be done first.",
@@ -779,10 +779,10 @@
         {
           "id": "SP-04-01",
           "name": "Fastify Server Scaffolded",
-          "status": "pending",
+          "status": "completed",
           "priority": "critical",
           "estimated_hours": 3,
-          "completed_at": null,
+          "completed_at": "2026-04-14T07:06:00Z",
           "dependencies": [
             "SP-01-03"
           ],
@@ -815,10 +815,10 @@
         {
           "id": "SP-04-02",
           "name": "All API Routes Implemented",
-          "status": "pending",
+          "status": "completed",
           "priority": "critical",
           "estimated_hours": 8,
-          "completed_at": null,
+          "completed_at": "2026-04-14T07:06:00Z",
           "dependencies": [
             "SP-04-01",
             "SP-03-05"
@@ -856,10 +856,10 @@
         {
           "id": "SP-04-03",
           "name": "API Tests Written & Passing",
-          "status": "pending",
+          "status": "completed",
           "priority": "critical",
           "estimated_hours": 5,
-          "completed_at": null,
+          "completed_at": "2026-04-14T07:06:00Z",
           "dependencies": [
             "SP-04-02"
           ],
