@@ -11,7 +11,7 @@ function WatchlistItem({ ticker, onRemove }: { ticker: string; onRemove: () => v
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9, x: -10 }}
-      className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 border border-white/5"
+      className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.025] border border-white/8"
     >
       <span className="text-sm font-mono font-semibold text-white">{ticker}</span>
       <button
@@ -79,7 +79,7 @@ export default function SettingsPage() {
       {/* Account */}
       <section className="space-y-4">
         <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest">Account</h2>
-        <div className="p-4 rounded-xl bg-zinc-900 border border-white/5 space-y-3">
+        <div className="p-4 rounded-xl bg-white/[0.025] border border-white/8 space-y-3">
           <div>
             <p className="text-xs text-gray-500 mb-1">Email</p>
             <p className="text-sm text-white font-mono">{user?.email ?? "—"}</p>
@@ -88,7 +88,7 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500 mb-1">User ID</p>
             <p className="text-xs text-gray-600 font-mono truncate">{user?.id ?? "—"}</p>
           </div>
-          <div className="pt-2 border-t border-white/5">
+          <div className="pt-2 border-t border-white/8">
             <button
               onClick={signOut}
               className="text-sm text-red-400 hover:text-red-300 transition-colors font-medium"
@@ -158,7 +158,7 @@ export default function SettingsPage() {
         {wlLoading ? (
           <div className="grid grid-cols-3 gap-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-10 rounded-lg bg-zinc-900 border border-white/5 animate-pulse" />
+              <div key={i} className="h-10 rounded-lg bg-white/[0.025] border border-white/8 animate-pulse" />
             ))}
           </div>
         ) : watchlist.length === 0 ? (
@@ -183,11 +183,11 @@ export default function SettingsPage() {
       {/* About */}
       <section className="space-y-4">
         <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest">About</h2>
-        <div className="p-4 rounded-xl bg-zinc-900 border border-white/5 space-y-2 text-sm text-gray-400">
+        <div className="p-4 rounded-xl bg-white/[0.025] border border-white/8 space-y-2 text-sm text-gray-400">
           <p><span className="text-gray-600">Platform</span> NSE AI Tracker v1.0</p>
           <p><span className="text-gray-600">Stack</span> React 19 · Vite 6 · Supabase · Claude AI</p>
           <p><span className="text-gray-600">Exchange</span> Nairobi Securities Exchange (NSE)</p>
-          <p className="text-xs text-gray-600 pt-2 border-t border-white/5">
+          <p className="text-xs text-gray-600 pt-2 border-t border-white/8">
             Not financial advice. AI-generated signals are for informational purposes only.
           </p>
         </div>

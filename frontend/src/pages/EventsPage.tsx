@@ -124,7 +124,7 @@ export default function EventsPage() {
                 className={`text-center py-2 rounded-lg border transition-colors ${
                   severity === s
                     ? `${cfg.bg} ${cfg.border} ${cfg.text}`
-                    : "bg-zinc-900 border-white/5 text-gray-500 hover:border-white/10"
+                    : "bg-white/[0.025] border-white/8 text-gray-500 hover:border-white/10"
                 }`}
               >
                 <div className="text-lg font-bold tabular-nums">{counts[s] ?? 0}</div>
@@ -137,7 +137,7 @@ export default function EventsPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 bg-zinc-900 border border-white/5 rounded-lg px-1 py-1">
+        <div className="flex items-center gap-1.5 bg-white/[0.025] border border-white/8 rounded-lg px-1 py-1">
           <Filter className="w-3 h-3 text-gray-500 ml-1.5" />
           {SEVERITIES.map(s => (
             <button
@@ -158,7 +158,7 @@ export default function EventsPage() {
           placeholder="Filter by ticker…"
           value={ticker}
           onChange={e => setTicker(e.target.value)}
-          className="flex-1 px-3 py-2 text-sm bg-zinc-900 border border-white/5 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/30 font-mono uppercase"
+          className="flex-1 px-3 py-2 text-sm bg-white/[0.025] border border-white/8 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/30 font-mono uppercase"
         />
       </div>
 
@@ -172,7 +172,7 @@ export default function EventsPage() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-zinc-900 border border-white/5 animate-pulse" />
+            <div key={i} className="h-24 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
           ))}
         </div>
       ) : events.length === 0 ? (
@@ -180,9 +180,14 @@ export default function EventsPage() {
           {error ? "Events unavailable" : "No events detected yet — run the event detection worker to populate this feed."}
         </div>
       ) : (
-        <div className="space-y-3">
+        <motion.div
+          className="space-y-3"
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+        >
           {events.map(e => <EventCard key={e.id} event={e} />)}
-        </div>
+        </motion.div>
       )}
     </div>
   );

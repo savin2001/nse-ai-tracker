@@ -46,7 +46,7 @@ function AllocationRow({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="flex items-center gap-4 px-4 py-3 rounded-xl bg-zinc-900 border border-white/5 hover:border-white/10 transition-colors"
+      className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white/[0.025] border border-white/8 hover:border-white/10 transition-colors"
     >
       {/* Ticker + name */}
       <div className="flex-1 min-w-0">
@@ -263,7 +263,7 @@ export default function PortfolioPage() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-zinc-900 border border-white/5 animate-pulse" />
+            <div key={i} className="h-16 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
           ))}
         </div>
       ) : allocs.length === 0 ? (
