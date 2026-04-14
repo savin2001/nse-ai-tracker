@@ -1,7 +1,7 @@
 # NSE AI Research Platform — Complete Technical Specification
 
 > **Stack update:** This document supersedes the Next.js/Fastify version.  
-> Frontend → **React 19 + Vite 6** | API → **Node.js 20 + Express 4** | Deploy → **Netlify (frontend) + Railway (API/workers)**
+> Frontend → **React 19 + Vite 6** | API → **Node.js 22 + Express 4** | Deploy → **Netlify (frontend) + Vultr VPS (API/workers)**
 
 ---
 
@@ -22,13 +22,13 @@ An AI-powered financial research system for the **Nairobi Securities Exchange (N
                        │ HTTPS / REST + SSE
 ┌──────────────────────▼──────────────────────────────────┐
 │                    API LAYER                             │
-│         Node.js 20 + Express 4  (Railway)               │
+│         Node.js 22 + Express 4  (Vultr VPS / Nginx)     │
 │   JWT Auth · Zod validation · Rate limiting             │
 └──────┬────────────────────────────┬─────────────────────┘
        │                            │
 ┌──────▼──────┐            ┌────────▼────────┐
 │  Supabase   │            │  Python Workers │
-│ PostgreSQL  │◄───────────│  (Railway cron) │
+│ PostgreSQL  │◄───────────│  (systemd timer) │
 │ + RLS       │            │  yfinance · AI  │
 └─────────────┘            └─────────────────┘
 ```
@@ -50,12 +50,13 @@ An AI-powered financial research system for the **Nairobi Securities Exchange (N
 | Language | TypeScript | 5.x | Full-stack |
 | Data workers | Python | 3.11 | yfinance, pandas, anthropic |
 | Database | PostgreSQL 15 | via Supabase | RLS enforced |
-| AI model | Claude | claude-sonnet-4-5 | Analysis & signals |
-| AI (fast) | Claude | claude-haiku-4-5 | Event classification |
+| AI model | Claude | claude-sonnet-4-6 | Signal generation (cached system prompt) |
+| AI (fast) | Claude | claude-haiku-4-5-20251001 | Event classification (4× cheaper) |
+| AI (powerful) | Claude | claude-opus-4-6 | Reserved for complex reasoning |
 | Auth | Supabase Auth | 2.x | JWT + refresh tokens |
 | Frontend host | Netlify | — | CDN + edge functions |
-| API host | Railway | — | Auto-deploy from GitHub |
-| Workers host | Railway | — | Cron jobs |
+| API host | Vultr VPS | Ubuntu 24.04 | Nginx + PM2, 127.0.0.1 bind |
+| Workers host | Vultr VPS | Ubuntu 24.04 | systemd timers (EAT schedule) |
 
 ---
 
@@ -604,11 +605,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          curl -fsSL https://railway.app/install.sh | sh
-          railway up --service api
+      - name: Deploy to Vultr VPS via SSH
+        run: |
+          rsync -az --delete api/dist/ deploy@${{ secrets.VPS_HOST }}:/opt/nse-ai-tracker/api/dist/
+          ssh deploy@${{ secrets.VPS_HOST }} "cd /opt/nse-ai-tracker/api && npm ci --omit=dev && pm2 restart nse-api"
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
 ```
 
 ### 11.3 Netlify Configuration (`netlify.toml`)
@@ -688,7 +690,7 @@ jobs:
 | `NEXT_PUBLIC_*` env vars | `VITE_*` env vars via `import.meta.env` |
 | `.next/` build output | `dist/` build output |
 | `next.config.js` | `vite.config.ts` |
-| Vercel deployment | Netlify (frontend) + Railway (API) |
+| Vercel deployment | Netlify (frontend) + Vultr VPS (API/workers) |
 | Next.js middleware | Express middleware in `api/src/middleware/` |
 | `next-auth` | Supabase Auth + custom `AuthGuard` component |
 
