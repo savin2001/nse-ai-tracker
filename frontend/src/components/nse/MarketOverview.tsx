@@ -8,7 +8,7 @@ import {
   MARKET_INDICES,
   type NSEStock,
 } from "../../data/nseData";
-import { getMarketSentiment, type MarketSentiment } from "../../services/geminiService";
+import { getMarketSentiment, type MarketSentiment } from "../../services/claudeService";
 
 function MoverRow({ stock, rank }: { stock: NSEStock; rank: number }) {
   const isUp = stock.changePercent >= 0;

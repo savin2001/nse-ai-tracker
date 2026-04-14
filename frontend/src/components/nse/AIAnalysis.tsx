@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Clock } from "lucide-react";
 import type { NSEStock } from "../../data/nseData";
-import { analyseStock, type StockAnalysis } from "../../services/geminiService";
+import { analyseStock, type StockAnalysis } from "../../services/claudeService";
 
 interface Props {
   stock: NSEStock;
@@ -43,7 +43,7 @@ export default function AIAnalysis({ stock }: Props) {
       const result = await analyseStock(stock);
       setAnalysis(result);
     } catch (e) {
-      setError("Analysis failed. Check your Gemini API key.");
+      setError("Analysis failed. The API may be unavailable — try again shortly.");
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ export default function AIAnalysis({ stock }: Props) {
         <div className="flex items-center gap-2">
           <Sparkles size={14} className="text-purple-400" />
           <span className="text-sm font-semibold text-white">AI Analysis</span>
-          <span className="text-xs text-gray-500 font-mono">· Gemini 2.0</span>
+          <span className="text-xs text-gray-500 font-mono">· Claude AI</span>
         </div>
         <button
           onClick={runAnalysis}
@@ -97,7 +97,7 @@ export default function AIAnalysis({ stock }: Props) {
               className="flex flex-col items-center justify-center py-10"
             >
               <div className="w-8 h-8 rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-spin mb-3" />
-              <p className="text-xs text-gray-500 font-mono">Asking Gemini…</p>
+              <p className="text-xs text-gray-500 font-mono">Asking Claude…</p>
             </motion.div>
           )}
 
@@ -145,7 +145,7 @@ export default function AIAnalysis({ stock }: Props) {
                     <span className="text-xs text-gray-500">Target Price</span>
                   </div>
                   <p className="text-base font-bold text-white tabular-nums">
-                    KES {analysis.targetPrice.toFixed(2)}
+                    {analysis.targetPrice != null ? `KES ${analysis.targetPrice.toFixed(2)}` : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-3">
