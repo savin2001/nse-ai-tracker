@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Clock } from "lucide-react";
 import type { NSEStock } from "../../data/nseData";
 import { analyseStock, type StockAnalysis } from "../../services/claudeService";
+import { useAIRequest } from "../../hooks/useAIRequest";
 
 interface Props {
   stock: NSEStock;
@@ -32,22 +33,10 @@ function ConfidenceBar({ value }: { value: number }) {
 }
 
 export default function AIAnalysis({ stock }: Props) {
-  const [analysis, setAnalysis] = useState<StockAnalysis | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const runAnalysis = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await analyseStock(stock);
-      setAnalysis(result);
-    } catch (e) {
-      setError("Analysis failed. The API may be unavailable — try again shortly.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // useCallback ensures the fn reference is stable so useAIRequest doesn't re-create
+  const fetchFn = useCallback(() => analyseStock(stock), [stock.symbol]);
+  const { data: analysis, loading, error, invoke: runAnalysis } =
+    useAIRequest<StockAnalysis>(fetchFn, { debounceMs: 1000 });
 
   const config = analysis ? SIGNAL_CONFIG[analysis.signal] : null;
 

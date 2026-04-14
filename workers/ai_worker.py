@@ -20,7 +20,14 @@ from analysis.sentiment import SentimentAnalysis
 from analysis.technical import TechnicalAnalysis
 from models.analysis import AnalysisResult
 from services.ai import SONNET, UsageRecord, calculate_cost, get_ai, log_usage
+from services.circuit_breaker import CircuitOpenError, sonnet_breaker
 from services.db import get_db, nse
+from services.prompt_guard import (
+    parse_and_validate_signal,
+    sanitize_company_name,
+    sanitize_headline,
+    SignalValidationError,
+)
 
 load_dotenv()
 log = structlog.get_logger()
@@ -82,6 +89,7 @@ def run() -> None:
     total_cost = 0.0
     processed  = 0
     errors     = 0
+    sonnet_breaker.reset_cost()  # reset per-run cost accumulator
 
     for co in companies:
         ticker = co["ticker"]
@@ -124,15 +132,24 @@ def run() -> None:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
             df["volume"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0).astype(int)
 
+            # Sanitise all external strings before prompt interpolation
+            safe_name   = sanitize_company_name(co.get("name", ticker))
+            safe_sector = sanitize_company_name(co.get("sector", "Unknown"))
+            # Sanitise article headlines that appear in sentiment reasons
+            safe_articles = [
+                {**a, "headline": sanitize_headline(a.get("headline", ""))}
+                for a in articles
+            ]
+
             tech = TechnicalAnalysis(df).analyse()
             fund = FundamentalAnalysis(financials, current_price=float(df.iloc[-1]["close"])).analyse()
-            sent = SentimentAnalysis(articles).analyse()
+            sent = SentimentAnalysis(safe_articles).analyse()
             last = df.iloc[-1]
 
             user_msg = USER_TEMPLATE.format(
                 ticker=ticker,
-                name=co.get("name", ticker),
-                sector=co.get("sector", "Unknown"),
+                name=safe_name,
+                sector=safe_sector,
                 tech_signal=tech.signal,     tech_score=tech.score,
                 tech_reasons="\n".join(f"- {r}" for r in tech.reasons) or "- N/A",
                 tech_indicators=json.dumps(tech.indicators),
@@ -147,29 +164,39 @@ def run() -> None:
                 rsi=tech.indicators.get("rsi", "N/A"),
             )
 
-            # ── Call Claude with cached system prompt ─────────────────────
-            # The system prompt is marked ephemeral so Anthropic caches it
-            # for ~5 minutes — all 20 stocks in one run share the cache hit.
-            msg = ai.messages.create(
-                model=SONNET,
-                max_tokens=512,
-                system=[{
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }],
-                messages=[{"role": "user", "content": user_msg}],
-            )
+            # ── Call Claude via circuit breaker + cached system prompt ────
+            try:
+                with sonnet_breaker:
+                    msg = ai.messages.create(
+                        model=SONNET,
+                        max_tokens=512,
+                        system=[{
+                            "type": "text",
+                            "text": SYSTEM_PROMPT,
+                            "cache_control": {"type": "ephemeral"},
+                        }],
+                        messages=[{"role": "user", "content": user_msg}],
+                    )
+            except CircuitOpenError as exc:
+                log.error("circuit_open_skip", ticker=ticker, reason=str(exc))
+                errors += 1
+                continue
 
             usage_rec = calculate_cost(SONNET, msg.usage)
             total_cost += usage_rec.cost_usd
+            sonnet_breaker.record_cost(usage_rec.cost_usd)
             log_usage(schema, usage_rec, worker="ai_worker",
                       task="signal_generation", ticker=ticker)
 
-            # ── Parse + persist signal ────────────────────────────────────
-            raw    = msg.content[0].text.strip()
-            parsed = json.loads(raw)
-            result = AnalysisResult(ticker=ticker, **parsed)
+            # ── Validate + parse output ───────────────────────────────────
+            raw = msg.content[0].text.strip()
+            try:
+                validated = parse_and_validate_signal(raw)
+            except (SignalValidationError, ValueError) as exc:
+                log.error("signal_validation_failed", ticker=ticker, error=str(exc))
+                errors += 1
+                continue
+            result = AnalysisResult(ticker=ticker, **validated)
 
             row = result.to_db_row()
             row["raw_context"] = {

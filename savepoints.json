@@ -1410,6 +1410,46 @@
           ]
         },
         {
+          "id": "SP-07-05",
+          "name": "AI-Specific Security Hardening Completed",
+          "status": "completed",
+          "priority": "critical",
+          "estimated_hours": 6,
+          "completed_at": "2026-04-14T12:00:00Z",
+          "dependencies": [
+            "SP-07-02"
+          ],
+          "tasks": [
+            "api/src/middleware/aiSecurity.ts: promptInjectionGuard (15 patterns, NFKD homoglyph normalisation), sanitizeForPrompt, validateAiJsonOutput, scrubPii",
+            "api/src/middleware/aiRateLimit.ts: per-user sliding-window rate limit (5 req/min), daily token budget (50k/day from model_usage), in-flight dedup by userId:ticker with 30s TTL",
+            "api/src/index.ts: wire promptInjectionGuard globally on all POST/PUT/PATCH; perUserAiRateLimit + dailyTokenBudget on /api/signals; deduplicateAiRequest on /api/stocks",
+            "workers/services/circuit_breaker.py: thread-safe CLOSED/OPEN/HALF_OPEN state machine with threading.Lock; sonnet_breaker ($5 cap, 3 failures, 120s recovery) and haiku_breaker ($1 cap, 5 failures, 60s recovery)",
+            "workers/services/prompt_guard.py: unicode-normalised injection detection on all external data; sanitize_headline (300 chars), sanitize_company_name (100 chars), scrub_pii; extract_json + validate_signal_response output pipeline; SignalValidationError exception",
+            "workers/ai_worker.py: sanitise company name + sector + article headlines before prompt interpolation; wrap Claude call with sonnet_breaker context manager; validate output with parse_and_validate_signal; fixed safe_articles-used-before-assignment bug",
+            "frontend/src/hooks/useDebounce.ts: generic debounce hook using useEffect + setTimeout cleanup",
+            "frontend/src/hooks/useAIRequest.ts: combined debounce (800ms) + in-flight dedup + stale-response cancellation via callId ref",
+            "frontend/src/components/nse/AIAnalysis.tsx: migrated from manual useState/async to useAIRequest hook"
+          ],
+          "acceptance_criteria": [
+            "POST with prompt injection payload (e.g. 'ignore previous instructions') returns 400",
+            "6th AI request within 60s from same user returns 429 with Retry-After header",
+            "Duplicate in-flight ticker request returns 429 immediately",
+            "Worker run with malicious news headline sanitises to [REDACTED] without crashing",
+            "Circuit opens after 3 consecutive Claude failures, remaining tickers skipped with circuit_open_skip log",
+            "Claude returning non-schema JSON raises SignalValidationError and ticker is skipped cleanly",
+            "Frontend: rapid Analyse button clicks do not fire duplicate API requests (debounce + dedup)",
+            "TypeScript tsc --noEmit passes with 0 errors on api/ and frontend/"
+          ],
+          "outputs": [
+            "api/src/middleware/aiSecurity.ts",
+            "api/src/middleware/aiRateLimit.ts",
+            "workers/services/circuit_breaker.py",
+            "workers/services/prompt_guard.py",
+            "frontend/src/hooks/useDebounce.ts",
+            "frontend/src/hooks/useAIRequest.ts"
+          ]
+        },
+        {
           "id": "SP-07-04",
           "name": "Full Test Suite Green in CI",
           "status": "pending",
@@ -1420,6 +1460,7 @@
             "SP-07-01",
             "SP-07-02",
             "SP-07-03",
+            "SP-07-05",
             "SP-02-07",
             "SP-04-03"
           ],
