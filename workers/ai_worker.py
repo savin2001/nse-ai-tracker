@@ -4,6 +4,9 @@ Combines technical, fundamental, and sentiment analysis into an
 enriched prompt for Claude and generates BUY/HOLD/SELL signals.
 
 Schedule: 18:00 EAT (Mon-Fri), after market close
+Model:    claude-sonnet-4-6 (balanced cost/capability for signal generation)
+Caching:  System prompt block cached — saves ~75 % on input tokens for
+          the 20-stock daily run (~600 tokens × 20 = 12 000 tokens/run).
 """
 import json
 from datetime import date, timedelta
@@ -16,42 +19,46 @@ from analysis.fundamental import FundamentalAnalysis
 from analysis.sentiment import SentimentAnalysis
 from analysis.technical import TechnicalAnalysis
 from models.analysis import AnalysisResult
-from services.ai import get_ai
+from services.ai import SONNET, UsageRecord, calculate_cost, get_ai, log_usage
 from services.db import get_db, nse
 
 load_dotenv()
 log = structlog.get_logger()
 
-SIGNAL_PROMPT = """You are a senior financial analyst specialising in the Nairobi Securities Exchange (NSE).
-You have been provided with pre-computed technical, fundamental, and sentiment analysis for a stock.
-Use this data to generate a final consolidated investment signal.
+# ── System prompt (cached — changes rarely) ────────────────────────────────────
+SYSTEM_PROMPT = (
+    "You are a senior financial analyst specialising in the Nairobi Securities "
+    "Exchange (NSE). You receive pre-computed technical, fundamental, and "
+    "sentiment scores for a stock and must produce a consolidated investment "
+    "signal. Be concise, data-driven, and aware of Kenya-specific macro risks "
+    "(KES/USD rate, CBK policy rate, commodity prices). "
+    "Respond ONLY with valid JSON — no markdown, no preamble."
+)
 
-## Stock
+USER_TEMPLATE = """## Stock
 Ticker:  {ticker}
 Company: {name}
 Sector:  {sector}
 
 ## Technical Analysis
-Signal: {tech_signal} (score: {tech_score})
+Signal: {tech_signal} (score: {tech_score:.3f})
 {tech_reasons}
 Indicators: {tech_indicators}
 
 ## Fundamental Analysis
-Signal: {fund_signal} (score: {fund_score})
+Signal: {fund_signal} (score: {fund_score:.3f})
 {fund_reasons}
 Metrics: {fund_metrics}
 
 ## Sentiment Analysis
-Signal: {sent_signal} (score: {sent_score})
+Signal: {sent_signal} (score: {sent_score:.3f})
 {sent_reasons}
 Articles analysed: {sent_count}
 
 ## Current Price Data
-Current Close: KES {close}
-SMA-20: {sma_20}
-RSI-14: {rsi}
+Close: KES {close}   SMA-20: {sma_20}   RSI-14: {rsi}
 
-Generate your consolidated signal. Respond ONLY with valid JSON (no markdown):
+Respond with this JSON (no other text):
 {{
   "signal": "BUY" | "HOLD" | "SELL",
   "confidence": <integer 0-100>,
@@ -63,14 +70,18 @@ Generate your consolidated signal. Respond ONLY with valid JSON (no markdown):
 }}"""
 
 
-def run():
-    db  = get_db()
-    ai  = get_ai()
+def run() -> None:
+    db     = get_db()
+    ai     = get_ai()
     schema = nse(db)
 
-    companies = schema.table("companies").select("*").execute().data
-    cutoff_35 = str(date.today() - timedelta(days=35))
-    cutoff_7  = str(date.today() - timedelta(days=7))
+    companies  = schema.table("companies").select("*").execute().data
+    cutoff_35  = str(date.today() - timedelta(days=35))
+    cutoff_7   = str(date.today() - timedelta(days=7))
+
+    total_cost = 0.0
+    processed  = 0
+    errors     = 0
 
     for co in companies:
         ticker = co["ticker"]
@@ -98,7 +109,6 @@ def run():
                 .execute()
                 .data
             )
-
             articles = (
                 schema.table("news_articles")
                 .select("headline, sentiment, published_at")
@@ -114,26 +124,22 @@ def run():
                 df[col] = pd.to_numeric(df[col], errors="coerce")
             df["volume"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0).astype(int)
 
-            tech  = TechnicalAnalysis(df).analyse()
-            fund  = FundamentalAnalysis(financials, current_price=df.iloc[-1]["close"]).analyse()
-            sent  = SentimentAnalysis(articles).analyse()
-
+            tech = TechnicalAnalysis(df).analyse()
+            fund = FundamentalAnalysis(financials, current_price=float(df.iloc[-1]["close"])).analyse()
+            sent = SentimentAnalysis(articles).analyse()
             last = df.iloc[-1]
 
-            prompt = SIGNAL_PROMPT.format(
+            user_msg = USER_TEMPLATE.format(
                 ticker=ticker,
                 name=co.get("name", ticker),
                 sector=co.get("sector", "Unknown"),
-                tech_signal=tech.signal,
-                tech_score=tech.score,
+                tech_signal=tech.signal,     tech_score=tech.score,
                 tech_reasons="\n".join(f"- {r}" for r in tech.reasons) or "- N/A",
                 tech_indicators=json.dumps(tech.indicators),
-                fund_signal=fund.signal,
-                fund_score=fund.score,
+                fund_signal=fund.signal,     fund_score=fund.score,
                 fund_reasons="\n".join(f"- {r}" for r in fund.reasons) or "- N/A",
                 fund_metrics=json.dumps(fund.metrics),
-                sent_signal=sent.signal,
-                sent_score=sent.score,
+                sent_signal=sent.signal,     sent_score=sent.score,
                 sent_reasons="\n".join(f"- {r}" for r in sent.reasons) or "- N/A",
                 sent_count=sent.article_count,
                 close=round(float(last["close"]), 2),
@@ -141,28 +147,60 @@ def run():
                 rsi=tech.indicators.get("rsi", "N/A"),
             )
 
+            # ── Call Claude with cached system prompt ─────────────────────
+            # The system prompt is marked ephemeral so Anthropic caches it
+            # for ~5 minutes — all 20 stocks in one run share the cache hit.
             msg = ai.messages.create(
-                model="claude-sonnet-4-5",
+                model=SONNET,
                 max_tokens=512,
-                messages=[{"role": "user", "content": prompt}],
+                system=[{
+                    "type": "text",
+                    "text": SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"},
+                }],
+                messages=[{"role": "user", "content": user_msg}],
             )
+
+            usage_rec = calculate_cost(SONNET, msg.usage)
+            total_cost += usage_rec.cost_usd
+            log_usage(schema, usage_rec, worker="ai_worker",
+                      task="signal_generation", ticker=ticker)
+
+            # ── Parse + persist signal ────────────────────────────────────
             raw    = msg.content[0].text.strip()
             parsed = json.loads(raw)
             result = AnalysisResult(ticker=ticker, **parsed)
 
             row = result.to_db_row()
             row["raw_context"] = {
-                "technical":   {"signal": tech.signal, "score": tech.score, "indicators": tech.indicators},
-                "fundamental": {"signal": fund.signal, "score": fund.score, "metrics": fund.metrics},
-                "sentiment":   {"signal": sent.signal, "score": sent.score, "articles": sent.article_count},
+                "technical":   {"signal": tech.signal, "score": tech.score,
+                                "indicators": tech.indicators},
+                "fundamental": {"signal": fund.signal, "score": fund.score,
+                                "metrics": fund.metrics},
+                "sentiment":   {"signal": sent.signal, "score": sent.score,
+                                "articles": sent.article_count},
+                "ai_cost_usd": usage_rec.cost_usd,
             }
-
             schema.table("analysis_results").insert(row).execute()
+            processed += 1
             log.info("signal_generated", ticker=ticker,
-                     signal=result.signal, confidence=result.confidence)
+                     signal=result.signal, confidence=result.confidence,
+                     cost_usd=usage_rec.cost_usd,
+                     cache_read_tokens=usage_rec.cache_read_tokens)
 
         except Exception as exc:
+            errors += 1
             log.error("signal_failed", ticker=ticker, error=str(exc))
+            log_usage(
+                schema,
+                UsageRecord(model=SONNET, input_tokens=0, output_tokens=0,
+                            cache_read_tokens=0, cache_write_tokens=0, cost_usd=0.0),
+                worker="ai_worker", task="signal_generation",
+                ticker=ticker, succeeded=False, error_message=str(exc),
+            )
+
+    log.info("run_complete", processed=processed, errors=errors,
+             total_cost_usd=round(total_cost, 6))
 
 
 if __name__ == "__main__":

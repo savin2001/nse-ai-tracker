@@ -10,6 +10,7 @@ import { portfolioRouter } from "./routes/portfolio";
 import { watchlistRouter } from "./routes/watchlist";
 import { eventsRouter }    from "./routes/events";
 import { macroRouter }     from "./routes/macro";
+import { notifyRouter }    from "./routes/notify";
 import { authMiddleware }  from "./middleware/auth";
 import { errorHandler }    from "./middleware/errorHandler";
 import { nse }             from "./services/supabase";
@@ -44,6 +45,7 @@ app.use("/api/portfolio", authMiddleware, portfolioRouter);
 app.use("/api/watchlist", authMiddleware, watchlistRouter);
 app.use("/api/events",    authMiddleware, eventsRouter);
 app.use("/api/macro",     authMiddleware, macroRouter);
+app.use("/api/notify",    notifyRouter);   // webhook — protected by NOTIFY_SECRET
 
 // ── Health check (no auth) ────────────────────────────────────────────────────
 app.get("/health", async (_req, res) => {

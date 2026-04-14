@@ -4,16 +4,32 @@ Scans news_articles and stock_prices for significant events,
 classifies them, and stores in nse.detected_events.
 
 Schedule: every hour (Mon-Fri)
+Model:    claude-haiku-4-5-20251001 — fast & cheap for classification-only tasks.
+          Pattern matching handles most events; Haiku is used only when a
+          headline matches multiple patterns and we need a single best category.
 """
-from datetime import date, timedelta, datetime, timezone
+import json
+from datetime import date, timedelta
 
 import structlog
 from dotenv import load_dotenv
 
+from services.ai import HAIKU, UsageRecord, calculate_cost, get_ai, log_usage
 from services.db import get_db, nse
 
 load_dotenv()
 log = structlog.get_logger()
+
+# ── Haiku classification prompt (used when ≥2 patterns match) ─────────────────
+CLASSIFY_PROMPT = """You are an NSE market analyst. Given a news headline, choose
+the single most relevant event type from this list:
+earnings_release, dividend_declared, rights_issue, merger_acquisition,
+regulatory_action, leadership_change, credit_rating, other
+
+Headline: {headline}
+
+Respond with ONLY a JSON object: {{"event_type": "<type>", "severity": "<low|medium|high|critical>"}}\
+"""
 
 # ── Event pattern library ─────────────────────────────────────────────────────
 
@@ -98,11 +114,90 @@ def detect_price_events(ticker: str, prices: list[dict]) -> list[dict]:
     return events
 
 
-def run():
-    db = get_db()
+def classify_with_haiku(
+    ai: object,
+    schema: object,
+    headline: str,
+    ticker: str,
+) -> tuple[str, str]:
+    """
+    Use Haiku to pick the best event_type when ≥2 patterns match.
+    Returns (event_type, severity). Falls back to ('other', 'low') on error.
+    """
+    try:
+        msg = ai.messages.create(
+            model=HAIKU,
+            max_tokens=64,
+            messages=[{"role": "user",
+                        "content": CLASSIFY_PROMPT.format(headline=headline)}],
+        )
+        rec = calculate_cost(HAIKU, msg.usage)
+        log_usage(schema, rec, worker="event_detector",
+                  task="event_classification", ticker=ticker)
+        parsed = json.loads(msg.content[0].text.strip())
+        return parsed.get("event_type", "other"), parsed.get("severity", "low")
+    except Exception as exc:
+        log.warning("haiku_classify_failed", ticker=ticker, error=str(exc))
+        log_usage(
+            schema,
+            UsageRecord(model=HAIKU, input_tokens=0, output_tokens=0,
+                        cache_read_tokens=0, cache_write_tokens=0, cost_usd=0.0),
+            worker="event_detector", task="event_classification",
+            ticker=ticker, succeeded=False, error_message=str(exc),
+        )
+        return "other", "low"
+
+
+def detect_news_events(
+    articles: list[dict],
+    ai: object | None = None,
+    schema: object | None = None,
+) -> list[dict]:
+    events = []
+    for article in articles:
+        headline = (article.get("headline") or "").lower()
+        ticker   = article.get("ticker")
+        if not ticker or not headline:
+            continue
+
+        matches = [
+            (event_type, severity)
+            for event_type, keywords, severity in NEWS_PATTERNS
+            if any(kw in headline for kw in keywords)
+        ]
+
+        if not matches:
+            continue
+
+        if len(matches) == 1 or ai is None:
+            event_type, severity = matches[0]
+        else:
+            # Multiple patterns matched — use Haiku to pick the best one
+            event_type, severity = classify_with_haiku(
+                ai, schema, article.get("headline", ""), ticker
+            )
+
+        events.append({
+            "ticker":      ticker,
+            "event_type":  event_type,
+            "severity":    severity,
+            "description": f"[news] {article.get('headline', '')[:250]}",
+            "metadata":    {
+                "source":       article.get("source"),
+                "url":          article.get("url"),
+                "published_at": article.get("published_at"),
+                "sentiment":    article.get("sentiment"),
+            },
+        })
+    return events
+
+
+def run() -> None:
+    db     = get_db()
+    ai     = get_ai()
     schema = nse(db)
     cutoff = str(date.today() - timedelta(days=2))
-    total = 0
+    total  = 0
 
     companies = schema.table("companies").select("ticker").execute().data
 
@@ -118,7 +213,7 @@ def run():
             .execute()
             .data
         )
-        news_events = detect_news_events(articles)
+        news_events = detect_news_events(articles, ai=ai, schema=schema)
 
         # ── Price-based events ────────────────────────────────────────────
         prices = (

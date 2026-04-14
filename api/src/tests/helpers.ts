@@ -26,7 +26,8 @@ export function buildQueryMock(data: unknown, error: unknown = null) {
     maybeSingle: () => Promise.resolve({ data: Array.isArray(data) ? data[0] ?? null : data, error }),
     execute:   () => Promise.resolve({ data, error }),
   };
-  q.then = (resolve: Function) => Promise.resolve({ data, error }).then(resolve);
+  q.then = (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
+    Promise.resolve({ data, error }).then(resolve);
   return q;
 }
 
