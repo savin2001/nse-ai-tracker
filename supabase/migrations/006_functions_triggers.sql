@@ -19,6 +19,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION nse.handle_new_user();
@@ -34,10 +35,12 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS nse_preferences_updated_at ON nse.user_preferences;
 CREATE TRIGGER nse_preferences_updated_at
   BEFORE UPDATE ON nse.user_preferences
   FOR EACH ROW EXECUTE FUNCTION nse.set_updated_at();
 
+DROP TRIGGER IF EXISTS nse_portfolio_updated_at ON nse.portfolio_allocations;
 CREATE TRIGGER nse_portfolio_updated_at
   BEFORE UPDATE ON nse.portfolio_allocations
   FOR EACH ROW EXECUTE FUNCTION nse.set_updated_at();
