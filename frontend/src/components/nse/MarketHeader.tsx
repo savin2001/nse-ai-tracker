@@ -1,4 +1,3 @@
-import React from "react";
 import { motion } from "motion/react";
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { MARKET_INDICES, type MarketIndex } from "../../data/nseData";

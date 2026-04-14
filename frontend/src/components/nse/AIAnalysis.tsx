@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Minus, AlertTriangle, Target, Clock } from "lucide-react";
 import type { NSEStock } from "../../data/nseData";

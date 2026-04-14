@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
 import { X, TrendingUp, TrendingDown, BarChart2 } from "lucide-react";
 import type { NSEStock } from "../../data/nseData";

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
 import { NSE_STOCKS, SECTORS, type NSEStock } from "../data/nseData";
@@ -42,7 +42,7 @@ function StockRow({ stock, onClick, selected }: { stock: NSEStock; onClick: () =
   );
 }
 
-export default function NSETracker() {
+export default function NSETracker({ embedded = false }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("All");
   const [view, setView] = useState<View>("grid");
@@ -59,10 +59,10 @@ export default function NSETracker() {
   }, [search, sector]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
-      <MarketHeader />
+    <div className={embedded ? "text-white" : "min-h-screen bg-[#050505] text-white"}>
+      {!embedded && <MarketHeader />}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className={embedded ? "space-y-6" : "max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6"}>
         {/* Market Overview */}
         <section>
           <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-3">
