@@ -9,6 +9,7 @@
  */
 import { Request, Response, NextFunction } from "express";
 import { randomUUID } from "crypto";
+import { logger } from "../services/logger";
 
 // ── Required env vars — crash at startup if missing ───────────────────────────
 const REQUIRED_ENV: string[] = [
@@ -20,14 +21,14 @@ const REQUIRED_ENV: string[] = [
 export function validateEnv(): void {
   const missing = REQUIRED_ENV.filter(k => !process.env[k]);
   if (missing.length > 0) {
-    console.error(`[boot] Missing required environment variables: ${missing.join(", ")}`);
+    logger.fatal({ missing }, "Missing required environment variables — shutting down");
     process.exit(1);
   }
   // Warn (but don't crash) on optional-but-important vars
   const optional = ["RESEND_API_KEY", "NOTIFY_SECRET", "ALLOWED_ORIGINS"];
   optional.forEach(k => {
     if (!process.env[k]) {
-      console.warn(`[boot] Warning: ${k} not set — some features will be unavailable`);
+      logger.warn({ variable: k }, "Optional env var not set — some features will be unavailable");
     }
   });
 }

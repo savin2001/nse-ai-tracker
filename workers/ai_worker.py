@@ -12,8 +12,9 @@ import json
 from datetime import date, timedelta
 
 import pandas as pd
-import structlog
 from dotenv import load_dotenv
+
+from services.logging import configure_logging, get_logger
 
 from analysis.fundamental import FundamentalAnalysis
 from analysis.sentiment import SentimentAnalysis
@@ -30,7 +31,8 @@ from services.prompt_guard import (
 )
 
 load_dotenv()
-log = structlog.get_logger()
+configure_logging()
+log = get_logger("ai_worker")
 
 # ── System prompt (cached — changes rarely) ────────────────────────────────────
 SYSTEM_PROMPT = (
