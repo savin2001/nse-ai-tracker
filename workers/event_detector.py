@@ -117,7 +117,7 @@ def detect_price_events(ticker: str, prices: list[dict]) -> list[dict]:
 def classify_with_haiku(
     ai: object,
     schema: object,
-    headline: str,
+    title: str,
     ticker: str,
 ) -> tuple[str, str]:
     """
