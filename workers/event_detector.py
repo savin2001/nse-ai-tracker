@@ -26,7 +26,7 @@ the single most relevant event type from this list:
 earnings_release, dividend_declared, rights_issue, merger_acquisition,
 regulatory_action, leadership_change, credit_rating, other
 
-Headline: {headline}
+Headline: {title}
 
 Respond with ONLY a JSON object: {{"event_type": "<type>", "severity": "<low|medium|high|critical>"}}\
 """
@@ -52,23 +52,23 @@ VOLUME_SURGE_MULT = 3.0   # >3x 20-day average volume
 def detect_news_events(articles: list[dict]) -> list[dict]:
     events = []
     for article in articles:
-        headline = (article.get("headline") or "").lower()
+        title = (article.get("title") or "").lower()
         ticker   = article.get("ticker")
-        if not ticker or not headline:
+        if not ticker or not title:
             continue
 
         for event_type, keywords, severity in NEWS_PATTERNS:
-            if any(kw in headline for kw in keywords):
+            if any(kw in title for kw in keywords):
                 events.append({
                     "ticker":      ticker,
                     "event_type":  event_type,
                     "severity":    severity,
-                    "description": f"[news] {article.get('headline', '')[:250]}",
+                    "description": f"[news] {article.get('title', '')[:250]}",
                     "metadata":    {
                         "source":       article.get("source"),
                         "url":          article.get("url"),
                         "published_at": article.get("published_at"),
-                        "sentiment":    article.get("sentiment"),
+                        "sentiment_score": article.get("sentiment_score"),
                     },
                 })
                 break  # one event per article
@@ -117,7 +117,7 @@ def detect_price_events(ticker: str, prices: list[dict]) -> list[dict]:
 def classify_with_haiku(
     ai: object,
     schema: object,
-    headline: str,
+    title: str,
     ticker: str,
 ) -> tuple[str, str]:
     """
@@ -129,7 +129,7 @@ def classify_with_haiku(
             model=HAIKU,
             max_tokens=64,
             messages=[{"role": "user",
-                        "content": CLASSIFY_PROMPT.format(headline=headline)}],
+                        "content": CLASSIFY_PROMPT.format(title=title)}],
         )
         rec = calculate_cost(HAIKU, msg.usage)
         log_usage(schema, rec, worker="event_detector",
@@ -155,15 +155,15 @@ def detect_news_events(
 ) -> list[dict]:
     events = []
     for article in articles:
-        headline = (article.get("headline") or "").lower()
+        title = (article.get("title") or "").lower()
         ticker   = article.get("ticker")
-        if not ticker or not headline:
+        if not ticker or not title:
             continue
 
         matches = [
             (event_type, severity)
             for event_type, keywords, severity in NEWS_PATTERNS
-            if any(kw in headline for kw in keywords)
+            if any(kw in title for kw in keywords)
         ]
 
         if not matches:
@@ -174,19 +174,19 @@ def detect_news_events(
         else:
             # Multiple patterns matched — use Haiku to pick the best one
             event_type, severity = classify_with_haiku(
-                ai, schema, article.get("headline", ""), ticker
+                ai, schema, article.get("title", ""), ticker
             )
 
         events.append({
             "ticker":      ticker,
             "event_type":  event_type,
             "severity":    severity,
-            "description": f"[news] {article.get('headline', '')[:250]}",
+            "description": f"[news] {article.get('title', '')[:250]}",
             "metadata":    {
                 "source":       article.get("source"),
                 "url":          article.get("url"),
                 "published_at": article.get("published_at"),
-                "sentiment":    article.get("sentiment"),
+                "sentiment_score": article.get("sentiment_score"),
             },
         })
     return events
@@ -207,7 +207,7 @@ def run() -> None:
         # ── News-based events ─────────────────────────────────────────────
         articles = (
             schema.table("news_articles")
-            .select("ticker, headline, source, url, published_at, sentiment")
+            .select("ticker, title, source, url, published_at, sentiment_score")
             .eq("ticker", ticker)
             .gte("published_at", cutoff)
             .execute()
