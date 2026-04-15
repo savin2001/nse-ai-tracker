@@ -68,7 +68,7 @@ def detect_news_events(articles: list[dict]) -> list[dict]:
                         "source":       article.get("source"),
                         "url":          article.get("url"),
                         "published_at": article.get("published_at"),
-                        "sentiment":    article.get("sentiment"),
+                        "sentiment_score": article.get("sentiment_score"),
                     },
                 })
                 break  # one event per article
@@ -186,7 +186,7 @@ def detect_news_events(
                 "source":       article.get("source"),
                 "url":          article.get("url"),
                 "published_at": article.get("published_at"),
-                "sentiment":    article.get("sentiment"),
+                "sentiment_score": article.get("sentiment_score"),
             },
         })
     return events
@@ -207,7 +207,7 @@ def run() -> None:
         # ── News-based events ─────────────────────────────────────────────
         articles = (
             schema.table("news_articles")
-            .select("ticker, title, source, url, published_at, sentiment")
+            .select("ticker, title, source, url, published_at, sentiment_score")
             .eq("ticker", ticker)
             .gte("published_at", cutoff)
             .execute()
