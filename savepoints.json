@@ -3,7 +3,7 @@
   "version": "2.0",
   "schema_version": "1.0",
   "description": "Granular save points for the full planning and construction lifecycle. Each save point must be completed and verified before dependents begin. Status: pending | in_progress | complete | blocked.",
-  "last_updated": "2026-04-15T06:46:10Z",
+  "last_updated": "2026-04-15T07:34:55Z",
   "legend": {
     "priority": {
       "critical": "Blocks all downstream work. Must be done first.",
@@ -1495,10 +1495,10 @@
         {
           "id": "SP-08-01",
           "name": "Frontend Deployed to Netlify",
-          "status": "pending",
+          "status": "completed",
           "priority": "critical",
           "estimated_hours": 2,
-          "completed_at": null,
+          "completed_at": "2026-04-15T07:34:55Z",
           "dependencies": [
             "SP-05-07",
             "SP-04-04"
@@ -1522,7 +1522,7 @@
           "outputs": [
             "Production Vercel URL"
           ],
-          "notes": "netlify.toml and deploy.yml already target Netlify. Connect repo in Netlify dashboard, set env vars (VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY), and update Supabase CORS + redirect URLs with the production domain."
+          "notes": "netlify.toml and deploy.yml already target Netlify. Connect repo in Netlify dashboard, set env vars (VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY), and update Supabase CORS + redirect URLs with the production domain. Deployed at https://nse-ai-tracker.netlify.app/"
         },
         {
           "id": "SP-08-02",
