@@ -22,13 +22,13 @@ jobs:
           NETLIFY_SITE_ID:    ${{ secrets.NETLIFY_SITE_ID }}
 
   deploy-api:
-    name: Deploy API → Railway
+    name: Deploy API → Render
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to Railway
+      - name: Trigger Render deploy hook
+        # RENDER_DEPLOY_HOOK_URL is a secret set in GitHub → Settings → Secrets.
+        # Get it from: Render dashboard → nse-ai-tracker-api → Settings → Deploy Hook
         run: |
-          curl -fsSL https://railway.app/install.sh | sh
-          railway up --service api
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          curl -fsSL --retry 3 \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" | \
+            python3 -c "import sys,json; d=json.load(sys.stdin); print('Deploy ID:', d.get('id','n/a'))"

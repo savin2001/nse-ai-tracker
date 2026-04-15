@@ -1,0 +1,40 @@
+# Render Blueprint — NSE AI Tracker
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Apply this blueprint from: Render dashboard → New → Blueprint
+# then connect savin2001/nse-ai-tracker and Render will create the service below.
+
+services:
+  - type: web
+    name: nse-ai-tracker-api
+    runtime: node
+    rootDir: api
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true          # deploy automatically on push to main
+    branch: main
+    plan: free                # upgrade to starter ($7/mo) for always-on
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      # The following must be set manually in the Render dashboard
+      # (marked sync:false so Render doesn't try to pull them from a file)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NOTIFY_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

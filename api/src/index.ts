@@ -194,7 +194,9 @@ app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT ?? 4000);
-app.listen(PORT, "127.0.0.1", () =>
+// Bind to 0.0.0.0 so Railway (and any cloud platform) can route traffic in.
+// 127.0.0.1 (loopback) only accepts connections from the same machine.
+app.listen(PORT, "0.0.0.0", () =>
   logger.info({ port: PORT }, "NSE AI Tracker API listening")
 );
 
