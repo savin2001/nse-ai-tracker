@@ -1,11 +1,75 @@
-# NSE AI Tracker — Vultr VPS Deployment Guide
+# NSE AI Tracker — Deployment Guide
+
+## Deployment Strategy
+
+| Environment | API host | Workers | Frontend |
+|-------------|----------|---------|----------|
+| **Staging / Testing** | [Render](https://render.com) free tier | Not deployed | Netlify |
+| **Production** | Vultr VPS (Ubuntu 24.04) | Vultr VPS (systemd timers) | Netlify |
+
+- **Staging on Render** — every push to `main` triggers an automatic redeploy via a Render deploy hook (see `.github/workflows/deploy.yml`). Free-tier instances spin down after 15 minutes of inactivity; the first request takes ~30 s to cold-start. Sufficient for integration testing, not for live traffic.
+- **Production on Vultr** — always-on Node.js process managed by PM2 behind Nginx with TLS. Workers run as systemd timers on the same VPS. Follow Part B below for the full setup.
+
+---
+
+## Part A — Staging Environment (Render)
+
+### A.1 Prerequisites
+
+- A [Render](https://render.com) account (free tier is fine for staging)
+- The `render.yaml` blueprint at the repo root
+
+### A.2 First-time setup via Render Blueprint
+
+1. Go to **Render dashboard → New → Blueprint**
+2. Connect the GitHub repo `savin2001/nse-ai-tracker`
+3. Render detects `render.yaml` and proposes the `nse-ai-tracker-api` web service
+4. Click **Apply** — Render creates the service and runs the first build
+
+### A.3 Set environment variables in Render dashboard
+
+Navigate to **nse-ai-tracker-api → Environment** and add the following secrets (these are marked `sync: false` in `render.yaml` so Render won't try to read them from a file):
+
+| Key | Description |
+|-----|-------------|
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (**private**) |
+| `SUPABASE_ANON_KEY` | Supabase anon key |
+| `ANTHROPIC_API_KEY` | Claude API key (**private**) |
+| `RESEND_API_KEY` | Email delivery key (**private**) |
+| `NOTIFY_SECRET` | Random hex string — `openssl rand -hex 32` |
+| `JWT_SECRET` | Random hex string — min 32 chars |
+| `ALLOWED_ORIGINS` | `https://nse-ai-tracker.netlify.app` |
+
+### A.4 Wire up the CI deploy hook
+
+1. In Render dashboard: **nse-ai-tracker-api → Settings → Deploy Hook** → copy the URL
+2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: `RENDER_DEPLOY_HOOK_URL`
+   - Value: the URL you copied
+
+Every push to `main` will now trigger a Render redeploy automatically.
+
+### A.5 Verify staging
+
+```bash
+curl https://nse-ai-tracker-api.onrender.com/health
+# Expected: {"status":"ok","ts":"..."}
+
+curl https://nse-ai-tracker-api.onrender.com/health/detailed
+# Expected: {"status":"ok","checks":{"db":{"status":"ok",...},...}}
+```
+
+---
+
+## Part B — Production Environment (Vultr VPS)
 
 > **Security first.** Complete every step in Section 2 (Server Hardening) before
 > exposing any port to the internet.
 
 ---
 
-## 1. Infrastructure Overview
+## B.1 Infrastructure Overview
 
 ```
 Browser / Netlify (React 19)
@@ -44,9 +108,9 @@ Browser / Netlify (React 19)
 
 ---
 
-## 2. Server Hardening (complete before anything else)
+## B.2 Server Hardening (complete before anything else)
 
-### 2.1 Initial SSH setup
+### B.2.1 Initial SSH setup
 
 ```bash
 # On your LOCAL machine — generate an ED25519 key if you don't have one
@@ -56,7 +120,7 @@ ssh-keygen -t ed25519 -C "nse-tracker-vultr"
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@YOUR_SERVER_IP
 ```
 
-### 2.2 First login — create non-root user
+### B.2.2 First login — create non-root user
 
 ```bash
 ssh root@YOUR_SERVER_IP
@@ -72,7 +136,7 @@ chown -R deploy:deploy /home/deploy/.ssh
 chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys
 ```
 
-### 2.3 Harden SSH daemon
+### B.2.3 Harden SSH daemon
 
 ```bash
 nano /etc/ssh/sshd_config
@@ -98,7 +162,7 @@ systemctl restart sshd
 ssh -p 2222 deploy@YOUR_SERVER_IP
 ```
 
-### 2.4 UFW firewall
+### B.2.4 UFW firewall
 
 ```bash
 ufw default deny incoming
@@ -110,7 +174,7 @@ ufw enable
 ufw status verbose
 ```
 
-### 2.5 Fail2ban
+### B.2.5 Fail2ban
 
 ```bash
 apt install -y fail2ban
@@ -141,7 +205,7 @@ systemctl enable --now fail2ban
 fail2ban-client status
 ```
 
-### 2.6 Automatic security updates
+### B.2.6 Automatic security updates
 
 ```bash
 apt install -y unattended-upgrades
@@ -151,14 +215,14 @@ dpkg-reconfigure --priority=low unattended-upgrades
 
 ---
 
-## 3. Software Installation
+## B.3 Software Installation
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git curl build-essential python3 python3-pip python3-venv nginx certbot python3-certbot-nginx
 ```
 
-### 3.1 Node.js 22 (via NodeSource)
+### B.3.1 Node.js 22 (via NodeSource)
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
@@ -166,7 +230,7 @@ sudo apt install -y nodejs
 node --version   # should print v22.x.x
 ```
 
-### 3.2 PM2
+### B.3.2 PM2
 
 ```bash
 sudo npm install -g pm2
@@ -176,9 +240,9 @@ sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u deploy --hp /home/deploy
 
 ---
 
-## 4. Application Deployment
+## B.4 Application Deployment
 
-### 4.1 Clone repository
+### B.4.1 Clone repository
 
 ```bash
 sudo mkdir -p /opt/nse-ai-tracker
@@ -186,7 +250,7 @@ sudo chown deploy:deploy /opt/nse-ai-tracker
 git clone https://github.com/savin2001/nse-ai-tracker.git /opt/nse-ai-tracker
 ```
 
-### 4.2 Environment variables
+### B.4.2 Environment variables
 
 ```bash
 # API
@@ -224,7 +288,7 @@ chmod 600 /opt/nse-ai-tracker/api/.env
 chmod 600 /opt/nse-ai-tracker/workers/.env
 ```
 
-### 4.3 Build Express API
+### B.4.3 Build Express API
 
 ```bash
 cd /opt/nse-ai-tracker/api
@@ -232,7 +296,7 @@ npm ci --production=false
 npm run build
 ```
 
-### 4.4 Start API with PM2
+### B.4.4 Start API with PM2
 
 ```bash
 cd /opt/nse-ai-tracker/api
@@ -248,7 +312,7 @@ curl http://127.0.0.1:4000/health
 # Expected: {"status":"ok","db":"connected"}
 ```
 
-### 4.5 Python workers virtual environment
+### B.4.5 Python workers virtual environment
 
 ```bash
 cd /opt/nse-ai-tracker/workers
@@ -261,7 +325,7 @@ deactivate
 
 ---
 
-## 5. Nginx Configuration
+## B.5 Nginx Configuration
 
 ```bash
 nano /etc/nginx/sites-available/nse-api
@@ -327,7 +391,7 @@ nginx -t
 systemctl reload nginx
 ```
 
-### 5.1 TLS via Let's Encrypt
+### B.5.1 TLS via Let's Encrypt
 
 ```bash
 certbot --nginx -d api.yourdomain.com --email osukaexperiments@gmail.com --agree-tos --no-eff-email
@@ -337,11 +401,11 @@ systemctl status certbot.timer
 
 ---
 
-## 6. Python Worker Cron (systemd timers)
+## B.6 Python Worker Cron (systemd timers)
 
 Create a shared service template, then individual timer units.
 
-### 6.1 Shared worker service template
+### B.6.1 Shared worker service template
 
 ```bash
 nano /etc/systemd/system/nse-worker@.service
@@ -373,7 +437,7 @@ ReadWritePaths=/opt/nse-ai-tracker/workers
 WantedBy=multi-user.target
 ```
 
-### 6.2 Timer units
+### B.6.2 Timer units
 
 ```bash
 # Helper function — creates a timer file
@@ -416,7 +480,7 @@ done
 systemctl list-timers | grep nse
 ```
 
-### 6.3 Email digest timer (calls email_worker.py digest)
+### B.6.3 Email digest timer (calls email_worker.py digest)
 
 ```bash
 # Override ExecStart for email_digest specifically
@@ -431,7 +495,7 @@ systemctl daemon-reload
 
 ---
 
-## 7. Database Migrations
+## B.7 Database Migrations
 
 Run all migrations against your Supabase project from the SQL Editor
 (Settings → SQL Editor in the Supabase dashboard):
@@ -450,9 +514,9 @@ Execute each file in order. Check for errors after each one.
 
 ---
 
-## 8. Monitoring & Maintenance
+## B.8 Monitoring & Maintenance
 
-### 8.1 View live logs
+### B.8.1 View live logs
 
 ```bash
 # API logs
@@ -463,14 +527,14 @@ journalctl -u nse-worker@ai_worker -f
 journalctl -u nse-worker@price_collector --since today
 ```
 
-### 8.2 Restart API
+### B.8.2 Restart API
 
 ```bash
 pm2 restart nse-api
 pm2 status
 ```
 
-### 8.3 Manual worker run
+### B.8.3 Manual worker run
 
 ```bash
 cd /opt/nse-ai-tracker/workers
@@ -480,7 +544,7 @@ python ai_worker.py
 python email_worker.py digest
 ```
 
-### 8.4 Deploy updates
+### B.8.4 Deploy updates
 
 ```bash
 cd /opt/nse-ai-tracker
@@ -494,7 +558,7 @@ pm2 restart nse-api
 cd ../workers && source .venv/bin/activate && pip install -r requirements.txt
 ```
 
-### 8.5 AI cost monitoring
+### B.8.5 AI cost monitoring
 
 ```sql
 -- Run in Supabase SQL Editor
@@ -503,7 +567,7 @@ SELECT * FROM nse.daily_ai_cost ORDER BY day DESC LIMIT 30;
 
 ---
 
-## 9. Vultr-Specific Tips
+## B.9 Vultr-Specific Tips
 
 - **Snapshots**: Take a Vultr snapshot after completing Section 2 (hardened base) and again after Section 4 (fully deployed). Snapshots cost ~$0.05/GB/month.
 - **Firewall Groups**: You can also enforce port rules in Vultr's web console under "Firewall" — this is an additional layer before UFW.
@@ -513,7 +577,7 @@ SELECT * FROM nse.daily_ai_cost ORDER BY day DESC LIMIT 30;
 
 ---
 
-## 10. Environment Variable Checklist
+## B.10 Environment Variable Checklist
 
 | Variable | Where set | Required |
 |----------|-----------|----------|
