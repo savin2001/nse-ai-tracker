@@ -12,9 +12,8 @@ import json
 from datetime import date, timedelta
 
 import pandas as pd
+import structlog
 from dotenv import load_dotenv
-
-from services.logging import configure_logging, get_logger
 
 from analysis.fundamental import FundamentalAnalysis
 from analysis.sentiment import SentimentAnalysis
@@ -31,8 +30,7 @@ from services.prompt_guard import (
 )
 
 load_dotenv()
-configure_logging()
-log = get_logger("ai_worker")
+log = structlog.get_logger()
 
 # ── System prompt (cached — changes rarely) ────────────────────────────────────
 SYSTEM_PROMPT = (
@@ -80,18 +78,21 @@ Respond with this JSON (no other text):
 
 
 def run() -> None:
-    db     = get_db()
-    ai     = get_ai()
-    schema = nse(db)
-
-    companies  = schema.table("companies").select("*").execute().data
-    cutoff_35  = str(date.today() - timedelta(days=35))
-    cutoff_7   = str(date.today() - timedelta(days=7))
+    try:
+        db     = get_db()
+        ai     = get_ai()
+        schema = nse(db)
+        companies = schema.table("companies").select("*").execute().data
+    except Exception as exc:
+        log.error("startup_failed", error=str(exc), exc_info=True)
+        raise
+    cutoff_35 = str(date.today() - timedelta(days=35))
+    cutoff_7  = str(date.today() - timedelta(days=7))
 
     total_cost = 0.0
     processed  = 0
     errors     = 0
-    sonnet_breaker.reset_cost()  # reset per-run cost accumulator
+    sonnet_breaker.reset_cost()
 
     for co in companies:
         ticker = co["ticker"]
