@@ -21,19 +21,21 @@ jobs:
         with:
           version: latest
 
-      # Start a local Supabase stack (Postgres + auth + realtime)
+      # Start local Supabase stack (Postgres + auth + realtime + pgTAP)
       - name: Start Supabase local stack
         run: supabase start
+        env:
+          # Supabase CLI reads these for the local project
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      # Apply all migrations to the local DB
-      - name: Push migrations
-        run: supabase db push --local
+      # supabase db reset applies all migrations in order from scratch
+      - name: Apply migrations (db reset)
+        run: supabase db reset --local
 
-      # Run pgTAP tests
+      # Run pgTAP tests — supabase test db discovers *.sql in supabase/tests/
       - name: Run RLS pgTAP tests
-        run: supabase test db
+        run: supabase test db --local
 
-      # Always capture test output even on failure
       - name: Stop Supabase
         if: always()
-        run: supabase stop
+        run: supabase stop --no-backup

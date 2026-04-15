@@ -12,11 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm", cache-dependency-path: frontend/package-lock.json }
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: cd frontend && npm ci
       - run: cd frontend && npm run lint
       - run: cd frontend && npm run build
-      - run: cd frontend && npm test -- --coverage --coverage.thresholds.lines=70 --coverage.thresholds.functions=70 --coverage.thresholds.branches=70 --reporter=json --outputFile=coverage/results.json
+      # Thresholds (lines/functions/branches ≥70%) are enforced in vitest.config.ts
+      - run: cd frontend && npm test -- --coverage
       - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -30,10 +34,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm", cache-dependency-path: api/package-lock.json }
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
       - run: cd api && npm ci
       - run: cd api && npm run build
-      - run: cd api && npm test -- --coverage --coverage.thresholds.lines=85 --coverage.thresholds.functions=85 --coverage.thresholds.branches=85
+      # Thresholds (lines/functions/branches ≥85%) are enforced in vitest.config.ts
+      - run: cd api && npm test -- --coverage
       - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -47,9 +55,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
       - run: cd workers && pip install -r requirements.txt
-      - run: cd workers && pytest --cov=. --cov-report=xml --cov-fail-under=80 -v
+      # --cov-fail-under=80 enforces coverage threshold in CI
+      - run: cd workers && pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -v
       - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

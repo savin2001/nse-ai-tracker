@@ -1494,7 +1494,7 @@
       "savepoints": [
         {
           "id": "SP-08-01",
-          "name": "Frontend Deployed to Vercel",
+          "name": "Frontend Deployed to Netlify",
           "status": "pending",
           "priority": "critical",
           "estimated_hours": 2,
@@ -1504,16 +1504,16 @@
             "SP-04-04"
           ],
           "tasks": [
-            "Import frontend/ GitHub repository path into Vercel",
-            "Set all NEXT_PUBLIC_* environment variables in Vercel dashboard (SUPABASE_URL, SUPABASE_ANON_KEY, API_URL)",
-            "Deploy \u2014 verify Vercel build completes with 0 errors",
+            "Import frontend/ GitHub repository path into Netlify",
+            "Set all NEXT_PUBLIC_* environment variables in Netlify dashboard (SUPABASE_URL, SUPABASE_ANON_KEY, API_URL)",
+            "Deploy \u2014 verify Netlify build completes with 0 errors",
             "Configure custom domain if available (optional)",
-            "Update Supabase Auth Redirect URL with production Vercel domain",
-            "Update CORS allowlist in Railway API with production Vercel domain",
+            "Update Supabase Auth Redirect URL with production Netlify domain",
+            "Update CORS allowlist in Railway API with production Netlify domain",
             "Verify production login flow end-to-end"
           ],
           "acceptance_criteria": [
-            "Vercel deployment succeeds with green build status",
+            "Netlify deployment succeeds with green build status",
             "Production URL loads landing page without errors",
             "Login on production URL redirects correctly to /dashboard",
             "No CORS errors in browser console on production",
@@ -1521,7 +1521,8 @@
           ],
           "outputs": [
             "Production Vercel URL"
-          ]
+          ],
+          "notes": "netlify.toml and deploy.yml already target Netlify. Connect repo in Netlify dashboard, set env vars (VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY), and update Supabase CORS + redirect URLs with the production domain."
         },
         {
           "id": "SP-08-02",
