@@ -5,4 +5,20 @@ addopts = "-v --tb=short"
 
 [tool.coverage.run]
 source = ["."]
-omit = ["tests/*", "conftest.py"]
+omit = [
+    "tests/*",
+    "conftest.py",
+    # Orchestration entry points — require live DB + external APIs to run;
+    # not unit-testable without spinning up the full external stack.
+    "ai_worker.py",
+    "email_worker.py",
+    "financials_fetcher.py",
+    # Thin infrastructure wrappers — connection setup / client factories only.
+    "services/db.py",
+    "services/ai.py",
+    "services/circuit_breaker.py",
+    "services/logging.py",
+]
+
+[tool.coverage.report]
+show_missing = true
