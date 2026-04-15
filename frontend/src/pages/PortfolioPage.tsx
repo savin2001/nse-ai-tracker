@@ -5,6 +5,7 @@ import {
   Minus, AlertCircle, RefreshCw, ChevronDown,
 } from "lucide-react";
 import { api, type Allocation } from "../api/client";
+import CompanySearch from "../components/nse/CompanySearch";
 
 function WeightBar({ weight }: { weight: number }) {
   return (
@@ -99,17 +100,17 @@ function AllocationRow({
 }
 
 function AddPositionForm({ onAdd }: { onAdd: (ticker: string, weight: number) => Promise<void> }) {
-  const [open, setOpen]     = useState(false);
-  const [ticker, setTicker] = useState("");
-  const [weight, setWeight] = useState("");
+  const [open,    setOpen]   = useState(false);
+  const [ticker,  setTicker] = useState("");
+  const [weight,  setWeight] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const w = parseFloat(weight);
-    if (!ticker.trim() || isNaN(w) || w <= 0 || w > 100) return;
+    if (!ticker || isNaN(w) || w <= 0 || w > 100) return;
     setLoading(true);
-    await onAdd(ticker.trim().toUpperCase(), w / 100);
+    await onAdd(ticker, w / 100);
     setTicker(""); setWeight(""); setOpen(false);
     setLoading(false);
   }
@@ -135,12 +136,11 @@ function AddPositionForm({ onAdd }: { onAdd: (ticker: string, weight: number) =>
             className="overflow-hidden"
           >
             <div className="flex gap-2 mt-3">
-              <input
-                placeholder="Ticker (e.g. SCOM)"
-                value={ticker}
-                onChange={e => setTicker(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm bg-black border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/40 font-mono uppercase"
-                required
+              <CompanySearch
+                onSelect={setTicker}
+                onClear={() => setTicker("")}
+                placeholder="Search company or ticker…"
+                className="flex-1"
               />
               <input
                 type="number"
@@ -155,7 +155,7 @@ function AddPositionForm({ onAdd }: { onAdd: (ticker: string, weight: number) =>
               />
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !ticker}
                 className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-sm font-semibold transition-colors"
               >
                 {loading ? "Adding…" : "Add"}

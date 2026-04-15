@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Bell, AlertCircle, RefreshCw, Filter } from "lucide-react";
 import { api, type MarketEvent } from "../api/client";
+import CompanySearch from "../components/nse/CompanySearch";
 
 const SEVERITY_CONFIG = {
   critical: { bg: "bg-red-500/10",    border: "border-red-500/30",    text: "text-red-400",    dot: "bg-red-500"    },
@@ -154,11 +155,11 @@ export default function EventsPage() {
           ))}
         </div>
 
-        <input
-          placeholder="Filter by ticker…"
-          value={ticker}
-          onChange={e => setTicker(e.target.value)}
-          className="flex-1 px-3 py-2 text-sm bg-white/[0.025] border border-white/8 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/30 font-mono uppercase"
+        <CompanySearch
+          onSelect={t => setTicker(t)}
+          onClear={() => setTicker("")}
+          placeholder="Filter by company or ticker…"
+          className="flex-1"
         />
       </div>
 
