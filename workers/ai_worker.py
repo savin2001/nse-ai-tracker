@@ -114,14 +114,14 @@ def run() -> None:
                 schema.table("financials")
                 .select("*")
                 .eq("ticker", ticker)
-                .order("period_end", desc=True)
+                .order("created_at", desc=True)
                 .limit(6)
                 .execute()
                 .data
             )
             articles = (
                 schema.table("news_articles")
-                .select("headline, sentiment, published_at")
+                .select("title, sentiment_score, published_at")
                 .eq("ticker", ticker)
                 .gte("published_at", cutoff_7)
                 .execute()
@@ -137,9 +137,13 @@ def run() -> None:
             # Sanitise all external strings before prompt interpolation
             safe_name   = sanitize_company_name(co.get("name", ticker))
             safe_sector = sanitize_company_name(co.get("sector", "Unknown"))
-            # Sanitise article headlines that appear in sentiment reasons
+            # Remap DB column names and sanitise headlines
             safe_articles = [
-                {**a, "headline": sanitize_headline(a.get("headline", ""))}
+                {
+                    **a,
+                    "headline":  sanitize_headline(a.get("title", "")),
+                    "sentiment": a.get("sentiment_score"),   # SentimentAnalysis expects "sentiment"
+                }
                 for a in articles
             ]
 
