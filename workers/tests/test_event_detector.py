@@ -11,35 +11,35 @@ from event_detector import detect_news_events, detect_price_events
 
 class TestDetectNewsEvents:
     def test_earnings_keyword_detected(self):
-        articles = [{"ticker": "SCOM", "headline": "Safaricom posts strong earnings results", "source": "BD", "url": None, "published_at": None, "sentiment": 0.5}]
+        articles = [{"ticker": "SCOM", "title": "Safaricom posts strong earnings results", "source": "BD", "url": None, "published_at": None, "sentiment_score": 0.5}]
         events = detect_news_events(articles)
         assert len(events) == 1
         assert events[0]["event_type"] == "earnings_release"
         assert events[0]["ticker"] == "SCOM"
 
     def test_dividend_detected(self):
-        articles = [{"ticker": "EQTY", "headline": "Equity Bank declares interim dividend", "source": "Nation", "url": None, "published_at": None, "sentiment": 0.3}]
+        articles = [{"ticker": "EQTY", "title": "Equity Bank declares interim dividend", "source": "Nation", "url": None, "published_at": None, "sentiment_score": 0.3}]
         events = detect_news_events(articles)
         assert events[0]["event_type"] == "dividend_declared"
 
     def test_regulatory_action_critical_severity(self):
-        articles = [{"ticker": "KCB", "headline": "CMA launches investigation into KCB dealings", "source": "BD", "url": None, "published_at": None, "sentiment": -0.8}]
+        articles = [{"ticker": "KCB", "title": "CMA launches investigation into KCB dealings", "source": "BD", "url": None, "published_at": None, "sentiment_score": -0.8}]
         events = detect_news_events(articles)
         assert events[0]["severity"] == "critical"
 
     def test_no_match_returns_empty(self):
-        articles = [{"ticker": "SCOM", "headline": "Safaricom AGM scheduled for June", "source": "BD", "url": None, "published_at": None, "sentiment": 0.0}]
+        articles = [{"ticker": "SCOM", "title": "Safaricom AGM scheduled for June", "source": "BD", "url": None, "published_at": None, "sentiment_score": 0.0}]
         events = detect_news_events(articles)
         assert events == []
 
     def test_one_event_per_article(self):
         # Headline matches multiple categories — only first match captured
-        articles = [{"ticker": "SCOM", "headline": "Safaricom records earnings profit and dividend", "source": "BD", "url": None, "published_at": None, "sentiment": 0.6}]
+        articles = [{"ticker": "SCOM", "title": "Safaricom records earnings profit and dividend", "source": "BD", "url": None, "published_at": None, "sentiment_score": 0.6}]
         events = detect_news_events(articles)
         assert len(events) == 1
 
     def test_missing_ticker_skipped(self):
-        articles = [{"ticker": None, "headline": "Some company reports profit", "source": "BD", "url": None, "published_at": None, "sentiment": 0.0}]
+        articles = [{"ticker": None, "title": "Some company reports profit", "source": "BD", "url": None, "published_at": None, "sentiment_score": 0.0}]
         events = detect_news_events(articles)
         assert events == []
 
