@@ -4,6 +4,7 @@ An AI-powered financial research dashboard for the **Nairobi Securities Exchange
 
 [![Tests](https://github.com/savin2001/nse-ai-tracker/actions/workflows/test.yml/badge.svg)](https://github.com/savin2001/nse-ai-tracker/actions)
 [![Deploy](https://github.com/savin2001/nse-ai-tracker/actions/workflows/deploy.yml/badge.svg)](https://github.com/savin2001/nse-ai-tracker/actions)
+[![codecov](https://codecov.io/gh/savin2001/nse-ai-tracker/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/savin2001/nse-ai-tracker)
 
 ---
 
