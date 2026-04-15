@@ -35,6 +35,11 @@ validateEnv();
 
 const app = express();
 
+// ── Trust Render/Cloudflare proxy so rate-limiter reads correct client IP ─────
+// Render sits behind Cloudflare (1 hop) + its own load balancer (1 hop).
+// Setting trust proxy to 2 lets express-rate-limit use X-Forwarded-For correctly.
+app.set("trust proxy", 2);
+
 // ── Security headers (Helmet) ─────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
@@ -82,6 +87,14 @@ app.use(stripServerHeader);
 app.use(blockPathTraversal);
 app.use(express.json({ limit: "10kb" }));
 app.use(requireJson);
+
+// ── Cache-Control — force revalidation on all API responses ──────────────────
+// Without this, browsers cache the initial empty-array responses (ETag match)
+// and won't show fresh data once workers populate the DB.
+app.use("/api/", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-cache");
+  next();
+});
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 // Global: 60 req/min per IP

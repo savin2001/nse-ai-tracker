@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Settings, Bookmark, Plus, X, AlertCircle, RefreshCw, Check } from "lucide-react";
+import { Settings, Plus, X, AlertCircle, RefreshCw, Check } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import CompanySearch from "../components/nse/CompanySearch";
 
 function WatchlistItem({ ticker, onRemove }: { ticker: string; onRemove: () => void }) {
   return (
@@ -29,7 +30,7 @@ export default function SettingsPage() {
   const [watchlist, setWatchlist]   = useState<string[]>([]);
   const [wlLoading, setWlLoading]   = useState(true);
   const [wlError, setWlError]       = useState<string | null>(null);
-  const [newTicker, setNewTicker]   = useState("");
+  const [newTicker, setNewTicker]   = useState<string>("");
   const [adding, setAdding]         = useState(false);
   const [saved, setSaved]           = useState(false);
 
@@ -44,7 +45,7 @@ export default function SettingsPage() {
 
   async function addTicker(e: React.FormEvent) {
     e.preventDefault();
-    const t = newTicker.trim().toUpperCase();
+    const t = newTicker.trim();
     if (!t || watchlist.includes(t)) return;
     setAdding(true);
     try {
@@ -135,18 +136,15 @@ export default function SettingsPage() {
 
         {/* Add ticker */}
         <form onSubmit={addTicker} className="flex gap-2">
-          <div className="relative flex-1">
-            <Bookmark className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
-            <input
-              placeholder="Add ticker (e.g. SCOM)"
-              value={newTicker}
-              onChange={e => setNewTicker(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm bg-black border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/40 font-mono uppercase"
-            />
-          </div>
+          <CompanySearch
+            onSelect={setNewTicker}
+            onClear={() => setNewTicker("")}
+            placeholder="Search company or ticker…"
+            className="flex-1"
+          />
           <button
             type="submit"
-            disabled={adding || !newTicker.trim()}
+            disabled={adding || !newTicker}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-sm font-semibold transition-colors"
           >
             <Plus className="w-4 h-4" />
