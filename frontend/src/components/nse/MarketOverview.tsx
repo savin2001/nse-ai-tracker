@@ -75,7 +75,7 @@ export default function MarketOverview() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Movers panel */}
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+      <div className="rounded-xl border border-white/8 bg-white/[0.025] overflow-hidden">
         <div className="flex border-b border-white/10">
           {(["gainers", "losers", "active"] as const).map((t) => (
             <button
@@ -121,7 +121,7 @@ export default function MarketOverview() {
       </div>
 
       {/* AI Sentiment panel */}
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+      <div className="rounded-xl border border-white/8 bg-white/[0.025] overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10">
           <div className="flex items-center gap-2">
             <Sparkles size={14} className="text-purple-400" />

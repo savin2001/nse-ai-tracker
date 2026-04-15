@@ -16,7 +16,13 @@ jobs:
       - run: cd frontend && npm ci
       - run: cd frontend && npm run lint
       - run: cd frontend && npm run build
-      - run: cd frontend && npm test
+      - run: cd frontend && npm test -- --coverage --coverage.thresholds.lines=70 --coverage.thresholds.functions=70 --coverage.thresholds.branches=70 --reporter=json --outputFile=coverage/results.json
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          fail_ci_if_error: false
 
   api:
     name: API (Express + Vitest)
@@ -27,7 +33,13 @@ jobs:
         with: { node-version: "20", cache: "npm", cache-dependency-path: api/package-lock.json }
       - run: cd api && npm ci
       - run: cd api && npm run build
-      - run: cd api && npm test
+      - run: cd api && npm test -- --coverage --coverage.thresholds.lines=85 --coverage.thresholds.functions=85 --coverage.thresholds.branches=85
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./api/coverage/coverage-final.json
+          flags: api
+          fail_ci_if_error: false
 
   workers:
     name: Workers (Pytest)
@@ -37,4 +49,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - run: cd workers && pip install -r requirements.txt
-      - run: cd workers && pytest --cov=. --cov-report=xml -v
+      - run: cd workers && pytest --cov=. --cov-report=xml --cov-fail-under=80 -v
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./workers/coverage.xml
+          flags: workers
+          fail_ci_if_error: false
