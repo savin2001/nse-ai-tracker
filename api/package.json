@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "commonjs",
+  "engines": { "node": ">=22.0.0" },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
