@@ -16,12 +16,13 @@ An AI-powered financial research dashboard for the **Nairobi Securities Exchange
 | Routing | React Router v6 |
 | Styling | Tailwind CSS v4 |
 | Charts | Recharts |
-| API | Node.js 20 + Express 4 |
+| API | Node.js 22 + Express 4 |
 | AI | Claude (Anthropic) |
 | Database | PostgreSQL via Supabase |
 | Workers | Python 3.11 |
 | Frontend host | Netlify |
-| API/Workers host | Railway |
+| API host (staging) | Render (free tier) |
+| API + Workers host (production) | Vultr VPS (Ubuntu 24.04) |
 
 ---
 
@@ -41,7 +42,7 @@ nse-ai-platform/
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - Python 3.11+
 - A [Supabase](https://supabase.com) project
 - An [Anthropic API key](https://console.anthropic.com)
@@ -173,13 +174,23 @@ npx playwright test
 
 ## Deployment
 
+### Staging (testing / PR validation)
+
 | Target | Platform | Trigger |
 |--------|----------|---------|
-| Frontend (`frontend/dist`) | Netlify | Push to `main` |
-| API | Railway | Push to `main` |
-| Workers (cron) | Railway | Scheduled (EAT timezone) |
+| Frontend | Netlify | Push to `main` |
+| API | Render (free tier) | Push to `main` via deploy hook |
 
-See `.github/workflows/deploy.yml` for the full pipeline.
+### Production
+
+| Target | Platform | How |
+|--------|----------|-----|
+| API | Vultr VPS — PM2 + Nginx | `git pull && pm2 restart` |
+| Workers (cron) | Vultr VPS — systemd timers | Auto-runs on schedule |
+
+> See `DEPLOYMENT.md` for the full Vultr VPS production setup guide and `render.yaml` for the Render service blueprint.
+
+See `.github/workflows/deploy.yml` for the CI/CD pipeline.
 
 ---
 
