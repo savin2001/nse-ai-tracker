@@ -9,7 +9,7 @@ services:
     name: nse-ai-tracker-api
     runtime: node
     rootDir: api
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true          # deploy automatically on push to main
