@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
-import { logger } from "@/services/logger";
+import { logger } from "../services/logger";
 
 interface Props {
   children: ReactNode;
