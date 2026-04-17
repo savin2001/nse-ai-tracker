@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { X, TrendingUp, TrendingDown, BarChart2 } from "lucide-react";
-import type { NSEStock } from "../../data/nseData";
+import type { NSEStock, PricePoint } from "../../data/nseData";
 import { formatVolume } from "../../data/nseData";
 import StockChart from "./StockChart";
 import AIAnalysis from "./AIAnalysis";
+import { api } from "../../api/client";
 
 interface Props {
   stock: NSEStock;
@@ -26,9 +27,30 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function StockDetail({ stock, onClose }: Props) {
   const [range, setRange] = useState<Range>("3M");
+  const [liveHistory, setLiveHistory] = useState<PricePoint[] | null>(null);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
   const isUp = stock.changePercent >= 0;
 
-  const displayHistory = stock.history.slice(-RANGE_DAYS[range]);
+  useEffect(() => {
+    let cancelled = false;
+    setLiveHistory(null);
+    setLivePrice(null);
+    api.stocks.prices(stock.symbol, 90)
+      .then(prices => {
+        if (cancelled || !prices.length) return;
+        // API returns newest-first; reverse to ascending for the chart
+        const asc = [...prices].reverse() as PricePoint[];
+        setLiveHistory(asc);
+        setLivePrice(asc[asc.length - 1].close);
+      })
+      .catch(() => {}); // silently fall back to static history
+    return () => { cancelled = true; };
+  }, [stock.symbol]);
+
+  const history = liveHistory ?? stock.history;
+  const displayHistory = history.slice(-RANGE_DAYS[range]);
+  const displayPrice = livePrice ?? stock.price;
+
   const rangeReturn =
     displayHistory.length > 1
       ? (
@@ -73,7 +95,10 @@ export default function StockDetail({ stock, onClose }: Props) {
       <div className="rounded-xl border border-white/8 bg-white/[0.025] p-5">
         <div className="flex items-end justify-between mb-1">
           <span className="text-3xl font-bold text-white tabular-nums">
-            KES {stock.price.toFixed(2)}
+            KES {displayPrice.toFixed(2)}
+            {liveHistory && (
+              <span className="ml-2 text-xs font-mono text-emerald-500/70 font-normal">live</span>
+            )}
           </span>
           <span
             className={`flex items-center gap-1 text-sm font-mono font-semibold ${

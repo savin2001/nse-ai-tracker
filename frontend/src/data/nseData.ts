@@ -111,7 +111,6 @@ export const NSE_STOCKS: NSEStock[] = [
   makeStock("IMH", "I&M Group PLC", "Banking", 21.85, -0.15, 870000, 34, 26.00, 18.00, 6.3, 5.7),
   makeStock("DTK", "Diamond Trust Bank Kenya", "Banking", 53.50, 0.50, 210000, 16, 62.00, 42.00, 8.4, 4.9),
   makeStock("SBIC", "Stanbic Holdings PLC", "Banking", 104.00, -0.75, 98000, 41, 115.00, 85.00, 9.6, 5.3),
-  makeStock("BAMB", "Bamburi Cement PLC", "Construction", 41.25, 1.25, 320000, 15, 51.00, 28.00, 14.2, 6.8),
   makeStock("TOTL", "TotalEnergies Marketing Kenya", "Energy", 20.50, 0.25, 180000, 4, 24.00, 16.50, 10.1, 7.5),
   makeStock("KEGN", "KenGen PLC", "Energy", 4.35, -0.05, 2840000, 18, 5.50, 3.40, 22.1, 2.1),
   makeStock("KPLC", "Kenya Power & Lighting Co.", "Energy", 1.82, 0.03, 7650000, 3, 2.90, 1.40, null, null),
@@ -119,7 +118,6 @@ export const NSE_STOCKS: NSEStock[] = [
   makeStock("KQ", "Kenya Airways PLC", "Aviation", 4.15, 0.10, 5120000, 6, 6.50, 3.20, null, null),
   makeStock("BOC", "BOC Kenya PLC", "Manufacturing", 87.50, 0.00, 8500, 3, 100.00, 74.00, 19.8, 3.1),
   makeStock("SASN", "Sasini PLC", "Agriculture", 18.40, 0.40, 145000, 3, 24.00, 14.50, 8.7, 5.2),
-  makeStock("LIMURU", "Limuru Tea PLC", "Agriculture", 590.00, -10.00, 2200, 4, 680.00, 480.00, 21.4, 2.8),
   makeStock("HFCK", "HF Group PLC", "Financial Services", 4.78, 0.08, 1240000, 3, 6.20, 3.80, null, null),
 ];
 
@@ -136,7 +134,6 @@ export const SECTORS = [
   "Telecommunications",
   "Energy",
   "Beverages",
-  "Construction",
   "Agriculture",
   "Media",
   "Aviation",

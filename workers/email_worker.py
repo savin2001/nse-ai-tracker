@@ -173,6 +173,9 @@ def send_email(to: str, subject: str, html: str) -> None:
         json={"from": FROM_EMAIL, "to": [to], "subject": subject, "html": html},
         timeout=15,
     )
+    if not resp.is_success:
+        log.error("resend_rejected", status=resp.status_code,
+                  body=resp.text, from_email=FROM_EMAIL, to=to)
     resp.raise_for_status()
     log.info("email_sent", to=to, subject=subject, id=resp.json().get("id"))
 
