@@ -39,7 +39,6 @@ TICKER_KEYWORDS: dict[str, list[str]] = {
     "IMH":   ["im bank", "imh", "imperial bank"],
     "DTK":   ["diamond trust", "dtb", "dtk"],
     "SBIC":  ["stanbic", "sbic"],
-    "BAMB":  ["bamburi cement", "bamb", "lafargeholcim"],
     "TOTL":  ["total energies", "totl", "total kenya"],
     "KEGN":  ["kengen", "kegn"],
     "KPLC":  ["kenya power", "kplc"],

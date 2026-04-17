@@ -12,15 +12,17 @@ const SEVERITY_CONFIG = {
 } as const;
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  earnings:       "Earnings",
-  dividend:       "Dividend",
-  rights_issue:   "Rights Issue",
-  ma:             "M&A",
-  regulatory:     "Regulatory",
-  leadership:     "Leadership",
-  credit_rating:  "Credit Rating",
-  price_spike:    "Price Spike",
-  volume_surge:   "Volume Surge",
+  earnings_release:   "Earnings",
+  dividend_declared:  "Dividend",
+  rights_issue:       "Rights Issue",
+  merger_acquisition: "M&A",
+  regulatory_action:  "Regulatory",
+  leadership_change:  "Leadership",
+  credit_rating:      "Credit Rating",
+  price_surge:        "Price Surge",
+  price_drop:         "Price Drop",
+  volume_surge:       "Volume Surge",
+  other:              "Other",
 };
 
 function EventCard({ event }: { event: MarketEvent }) {

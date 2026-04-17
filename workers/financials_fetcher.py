@@ -21,8 +21,8 @@ log = structlog.get_logger()
 # Tickers available on Yahoo Finance with .NR suffix
 NSE_TICKERS = [
     "SCOM.NR", "EQTY.NR", "KCB.NR",  "EABL.NR", "COOP.NR",
-    "SCBK.NR", "ABSA.NR", "DTK.NR",  "SBIC.NR",
-    "BAMB.NR", "TOTL.NR", "KEGN.NR", "KPLC.NR", "NMG.NR",
+    "SCBK.NR", "ABSA.NR", "IMH.NR",  "DTK.NR",  "SBIC.NR",
+    "TOTL.NR", "KEGN.NR", "KPLC.NR", "NMG.NR",
     "KQ.NR",   "BOC.NR",  "SASN.NR", "HFCK.NR",
 ]
 
