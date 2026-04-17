@@ -166,6 +166,10 @@ def build_event_alert_html(event: dict) -> str:
 def send_email(to: str, subject: str, html: str) -> None:
     if not RESEND_KEY:
         raise ValueError("Missing RESEND_API_KEY")
+    if not to or "@" not in to:
+        raise ValueError(f"Invalid ALERT_EMAIL: {to!r} — set the ALERT_EMAIL GitHub Actions variable")
+    if not FROM_EMAIL or "@" not in FROM_EMAIL:
+        raise ValueError(f"Invalid RESEND_FROM_EMAIL: {FROM_EMAIL!r} — set the RESEND_FROM_EMAIL GitHub Actions variable")
     resp = httpx.post(
         RESEND_API,
         headers={"Authorization": f"Bearer {RESEND_KEY}",
