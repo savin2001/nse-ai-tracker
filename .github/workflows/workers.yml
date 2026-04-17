@@ -63,6 +63,8 @@ jobs:
         env:
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TV_USERNAME:               ${{ secrets.TV_USERNAME }}
+          TV_PASSWORD:               ${{ secrets.TV_PASSWORD }}
         run: python price_collector.py
 
       # ── event_detector ───────────────────────────────────────────────────────

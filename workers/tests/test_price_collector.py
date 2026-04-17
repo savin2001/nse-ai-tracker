@@ -3,7 +3,7 @@ import sys
 from unittest.mock import MagicMock
 
 # Stub packages unavailable in the minimal test install.
-for mod in ("yfinance", "supabase", "structlog"):
+for mod in ("tvDatafeed", "supabase", "structlog"):
     sys.modules.setdefault(mod, MagicMock())
 
 import tenacity as _tc
@@ -25,7 +25,6 @@ class TestBuildRows:
         assert len(rows) == 3
 
     def test_ticker_matches_symbol_arg(self, sample_ohlcv):
-        # build_rows uses the symbol directly as the ticker (no suffix to strip)
         rows = build_rows("SCOM", sample_ohlcv)
         assert all(r["ticker"] == "SCOM" for r in rows)
 
@@ -46,11 +45,14 @@ class TestBuildRows:
 
 
 class TestNSETickers:
-    def test_19_tickers(self):
-        assert len(NSE_TICKERS) == 19
+    def test_20_tickers(self):
+        assert len(NSE_TICKERS) == 20
+
+    def test_limuru_included(self):
+        assert "LIMURU" in NSE_TICKERS
 
     def test_symbols_are_bare(self):
-        # .NR suffix is added at fetch time; symbols stored without suffix
+        # NSEKE exchange code is added at fetch time; symbols stored without suffix
         assert all("." not in t for t in NSE_TICKERS)
 
 
@@ -68,7 +70,7 @@ class TestRun:
         from price_collector import run
         run()
 
-        assert mock_fetch.call_count == 19
+        assert mock_fetch.call_count == 20
 
     @patch("price_collector.time.sleep")
     @patch("price_collector.fetch_ticker")
