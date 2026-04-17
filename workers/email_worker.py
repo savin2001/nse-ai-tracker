@@ -189,22 +189,20 @@ def send_email(to: str, subject: str, html: str) -> None:
 # ── Worker entrypoints ────────────────────────────────────────────────────────
 
 def send_daily_digest() -> None:
-    """Fetch today's signals and email the digest."""
+    """Fetch the latest signal per ticker and email the digest."""
     db     = get_db()
     schema = nse(db)
-    today  = str(date.today())
 
     signals = (
-        schema.table("analysis_results")
+        schema.table("latest_signals")
         .select("ticker, signal, confidence, summary")
-        .gte("generated_at", today)
         .order("confidence", desc=True)
         .execute()
         .data
     )
 
     if not signals:
-        log.warning("no_signals_today", date=today)
+        log.warning("no_signals_today", date=str(date.today()))
         return
 
     date_str = datetime.now(tz=timezone.utc).strftime("%A, %d %B %Y")
