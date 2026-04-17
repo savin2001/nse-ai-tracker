@@ -1,16 +1,21 @@
 """
 NSE Email Worker
-Sends the daily signal digest to osukaexperiments@gmail.com via Resend.
+Sends the daily signal digest via Gmail SMTP (no custom domain needed).
 
 Schedule: 18:30 EAT (Mon-Fri) — runs after ai_worker generates signals at 18:00.
 Also triggered ad-hoc via POST /api/notify/digest from the Express API.
 
-Requires env: RESEND_API_KEY, RESEND_FROM_EMAIL, ALERT_EMAIL
+Requires env:
+  GMAIL_USER         — sender Gmail address (e.g. yourname@gmail.com)
+  GMAIL_APP_PASSWORD — 16-char App Password from myaccount.google.com/apppasswords
+  ALERT_EMAIL        — recipient address
 """
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import date, timedelta, datetime, timezone
 
-import httpx
 import structlog
 from dotenv import load_dotenv
 
@@ -19,10 +24,9 @@ from services.db import get_db, nse
 load_dotenv()
 log = structlog.get_logger()
 
-RESEND_API  = "https://api.resend.com/emails"
-RESEND_KEY  = os.environ.get("RESEND_API_KEY", "")
-FROM_EMAIL  = os.environ.get("RESEND_FROM_EMAIL", "nse-tracker@yourdomain.com")
-ALERT_EMAIL = os.environ.get("ALERT_EMAIL", "osukaexperiments@gmail.com")
+GMAIL_USER     = os.environ.get("GMAIL_USER", "")
+GMAIL_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+ALERT_EMAIL    = os.environ.get("ALERT_EMAIL", "")
 
 # ── HTML helpers ──────────────────────────────────────────────────────────────
 
@@ -164,20 +168,22 @@ def build_event_alert_html(event: dict) -> str:
 # ── Send via Resend ───────────────────────────────────────────────────────────
 
 def send_email(to: str, subject: str, html: str) -> None:
-    if not RESEND_KEY:
-        raise ValueError("Missing RESEND_API_KEY")
-    resp = httpx.post(
-        RESEND_API,
-        headers={"Authorization": f"Bearer {RESEND_KEY}",
-                 "Content-Type": "application/json"},
-        json={"from": FROM_EMAIL, "to": [to], "subject": subject, "html": html},
-        timeout=15,
-    )
-    if not resp.is_success:
-        log.error("resend_rejected", status=resp.status_code,
-                  body=resp.text, from_email=FROM_EMAIL, to=to)
-    resp.raise_for_status()
-    log.info("email_sent", to=to, subject=subject, id=resp.json().get("id"))
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        raise ValueError("Missing GMAIL_USER or GMAIL_APP_PASSWORD — add them as GitHub Actions secrets")
+    if not to or "@" not in to:
+        raise ValueError(f"Invalid ALERT_EMAIL: {to!r} — set the ALERT_EMAIL GitHub Actions variable")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"NSE AI Tracker <{GMAIL_USER}>"
+    msg["To"]      = to
+    msg.attach(MIMEText(html, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(GMAIL_USER, GMAIL_PASSWORD)
+        server.sendmail(GMAIL_USER, [to], msg.as_string())
+
+    log.info("email_sent", to=to, subject=subject)
 
 
 # ── Worker entrypoints ────────────────────────────────────────────────────────
