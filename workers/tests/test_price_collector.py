@@ -45,11 +45,13 @@ class TestBuildRows:
 
 
 class TestNSETickers:
-    def test_20_tickers(self):
-        assert len(NSE_TICKERS) == 20
+    def test_18_tickers(self):
+        assert len(NSE_TICKERS) == 18
 
-    def test_limuru_included(self):
-        assert "LIMURU" in NSE_TICKERS
+    def test_excludes_delisted(self):
+        # BAMB delisted 2023; LIMURU not on TradingView NSEKE
+        assert "BAMB"   not in NSE_TICKERS
+        assert "LIMURU" not in NSE_TICKERS
 
     def test_symbols_are_bare(self):
         # NSEKE exchange code is added at fetch time; symbols stored without suffix
@@ -70,7 +72,7 @@ class TestRun:
         from price_collector import run
         run()
 
-        assert mock_fetch.call_count == 20
+        assert mock_fetch.call_count == 18
 
     @patch("price_collector.time.sleep")
     @patch("price_collector.fetch_ticker")

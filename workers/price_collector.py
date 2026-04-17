@@ -24,11 +24,13 @@ load_dotenv()
 log = structlog.get_logger()
 
 # NSE tickers — bare symbols (NSEKE exchange code added at fetch time)
+# BAMB excluded: delisted 2023 (acquired by Savannah Clinker)
+# LIMURU excluded: not carried by TradingView NSEKE
 NSE_TICKERS = [
-    "SCOM",   "EQTY",  "KCB",   "EABL",   "COOP",
-    "SCBK",   "ABSA",  "IMH",   "DTK",    "SBIC",
-    "BAMB",   "TOTL",  "KEGN",  "KPLC",   "NMG",
-    "KQ",     "BOC",   "SASN",  "HFCK",   "LIMURU",
+    "SCOM",  "EQTY",  "KCB",   "EABL",  "COOP",
+    "SCBK",  "ABSA",  "IMH",   "DTK",   "SBIC",
+    "TOTL",  "KEGN",  "KPLC",  "NMG",
+    "KQ",    "BOC",   "SASN",  "HFCK",
 ]
 
 _tv: TvDatafeed = None
