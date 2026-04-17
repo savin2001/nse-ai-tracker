@@ -3,11 +3,8 @@ import sys
 from unittest.mock import MagicMock
 
 # Stub packages unavailable in the minimal test install.
-# price_collector now uses pandas_datareader (Stooq) instead of yfinance.
-_pdr_mock = MagicMock()
-for mod in ("pandas_datareader", "pandas_datareader.data", "supabase", "structlog"):
+for mod in ("yfinance", "supabase", "structlog"):
     sys.modules.setdefault(mod, MagicMock())
-sys.modules["pandas_datareader.data"] = _pdr_mock
 
 import tenacity as _tc
 _tc.retry = lambda *a, **kw: (lambda f: f)
@@ -53,7 +50,7 @@ class TestNSETickers:
         assert len(NSE_TICKERS) == 19
 
     def test_symbols_are_bare(self):
-        # Switched to Stooq: tickers are bare symbols without exchange suffix
+        # .NR suffix is added at fetch time; symbols stored without suffix
         assert all("." not in t for t in NSE_TICKERS)
 
 
