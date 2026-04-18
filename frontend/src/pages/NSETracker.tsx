@@ -78,16 +78,16 @@ export default function NSETracker({ embedded = false }: { embedded?: boolean })
               Equities &mdash; {filtered.length} stocks
             </h2>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               {/* Search */}
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-none">
                 <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
                   placeholder="Search…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 pr-3 py-2 text-xs font-mono bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-white/30 w-40"
+                  className="pl-8 pr-3 py-2 text-xs font-mono bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-white/30 w-full sm:w-40"
                 />
               </div>
 
@@ -151,10 +151,10 @@ export default function NSETracker({ embedded = false }: { embedded?: boolean })
             )}
           </AnimatePresence>
 
-          {/* Two-column layout: stock list + detail panel */}
-          <div className={`flex gap-5 ${selected ? "items-start" : ""}`}>
+          {/* Layout: side-by-side on desktop, stacked on mobile */}
+          <div className={`flex flex-col md:flex-row gap-5 ${selected ? "md:items-start" : ""}`}>
             {/* Stock list */}
-            <div className={`flex-1 min-w-0 transition-all duration-300 ${selected ? "max-w-[55%]" : "w-full"}`}>
+            <div className={`flex-1 min-w-0 transition-all duration-300 ${selected ? "md:max-w-[55%]" : "w-full"}`}>
               {view === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   {filtered.map((stock, i) => (
@@ -215,7 +215,7 @@ export default function NSETracker({ embedded = false }: { embedded?: boolean })
             {/* Detail panel */}
             <AnimatePresence>
               {selected && (
-                <div className="w-[42%] shrink-0 sticky top-[110px] max-h-[calc(100vh-130px)] overflow-y-auto no-scrollbar">
+                <div className="w-full md:w-[42%] md:shrink-0 md:sticky md:top-[56px] md:max-h-[calc(100vh-72px)] md:overflow-y-auto no-scrollbar">
                   <StockDetail
                     stock={selected}
                     onClose={() => setSelected(null)}

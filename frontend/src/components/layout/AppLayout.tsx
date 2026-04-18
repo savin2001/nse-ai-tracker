@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import Sidebar from "./Sidebar";
@@ -5,12 +6,22 @@ import Topbar from "./Topbar";
 
 export default function AppLayout() {
   const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-black">
-      <Sidebar />
+      {/* Mobile nav backdrop */}
+      {navOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          onClick={() => setNavOpen(false)}
+        />
+      )}
+
+      <Sidebar mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
+
       <div className="flex flex-col flex-1 min-w-0">
-        <Topbar />
+        <Topbar onMenuClick={() => setNavOpen(v => !v)} />
         <main className="flex-1 overflow-auto">
           <AnimatePresence mode="wait">
             <motion.div

@@ -136,7 +136,7 @@ export default function DashboardPage() {
   }, {} as Record<SigKey, number>);
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-4 sm:p-6 space-y-8">
 
       {/* ── AI Signals ────────────────────────────────────────────────────── */}
       <section>
@@ -157,7 +157,7 @@ export default function DashboardPage() {
 
         {/* Summary tiles */}
         {signals.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
             {(["BUY", "HOLD", "SELL"] as const).map((s, i) => (
               <SummaryTile key={s} label={s} count={counts[s] ?? 0} cfg={SIG_CFG[s]} i={i} />
             ))}
