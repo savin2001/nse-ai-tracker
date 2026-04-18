@@ -23,11 +23,8 @@ import {
   requireJson,
 } from "./middleware/security";
 import { promptInjectionGuard } from "./middleware/aiSecurity";
-import {
-  perUserAiRateLimit,
-  dailyTokenBudget,
-  deduplicateAiRequest,
-} from "./middleware/aiRateLimit";
+// aiRateLimit middleware retained for future routes that invoke Claude directly
+// import { perUserAiRateLimit, dailyTokenBudget, deduplicateAiRequest } from "./middleware/aiRateLimit";
 import { nse } from "./services/supabase";
 
 // ── Fail fast on missing env vars ─────────────────────────────────────────────
@@ -125,21 +122,11 @@ app.use("/api/notify", rateLimit({
 // Prompt injection guard runs globally on all mutating requests (POST/PUT/PATCH)
 app.use(promptInjectionGuard);
 
-// AI-heavy signal routes: per-user rate limit + daily token budget + dedup
-app.use("/api/signals",
-  authMiddleware,
-  perUserAiRateLimit,
-  dailyTokenBudget,
-  signalsRouter,
-);
+// Signals — pure DB reads; no Claude calls here (AI runs in background workers)
+app.use("/api/signals", authMiddleware, signalsRouter);
 
-// Stock detail may trigger analysis — dedup by ticker
-app.use("/api/stocks",
-  authMiddleware,
-  perUserAiRateLimit,
-  deduplicateAiRequest,
-  stocksRouter,
-);
+// Stocks — price/detail endpoints are DB reads; no live Claude calls
+app.use("/api/stocks", authMiddleware, stocksRouter);
 
 // Portfolio + watchlist accept free-text rationale — injection guard already global
 app.use("/api/portfolio", authMiddleware, portfolioRouter);
