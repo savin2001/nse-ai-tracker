@@ -1,8 +1,11 @@
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import type { NSEStock } from "../../data/nseData";
 import { formatVolume } from "../../data/nseData";
 import StockChart from "./StockChart";
+import { api } from "../../api/client";
+import type { PricePoint } from "../../data/nseData";
 
 interface Props {
   stock: NSEStock;
@@ -12,6 +15,19 @@ interface Props {
 }
 
 export default function StockCard({ stock, onClick, selected, index }: Props) {
+  const [sparkHistory, setSparkHistory] = useState<PricePoint[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.stocks.prices(stock.symbol, 30)
+      .then(prices => {
+        if (cancelled || !prices.length) return;
+        setSparkHistory([...prices].reverse() as PricePoint[]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [stock.symbol]);
+
   const isUp = stock.changePercent >= 0;
 
   // Directional colours
@@ -69,7 +85,7 @@ export default function StockCard({ stock, onClick, selected, index }: Props) {
 
         {/* Sparkline */}
         <div className="h-10 mb-3 opacity-60 group-hover:opacity-95 transition-opacity duration-200">
-          <StockChart history={stock.history} height={40} />
+          <StockChart history={sparkHistory ?? stock.history} height={40} />
         </div>
 
         {/* Footer */}

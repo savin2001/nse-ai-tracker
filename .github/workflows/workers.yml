@@ -14,6 +14,7 @@ on:
         options:
           - all
           - price_collector
+          - price_collector_backfill
           - event_detector
           - ai_worker
           - email_worker
@@ -66,6 +67,16 @@ jobs:
           TV_USERNAME:               ${{ secrets.TV_USERNAME }}
           TV_PASSWORD:               ${{ secrets.TV_PASSWORD }}
         run: python price_collector.py
+
+      # ── price_collector_backfill ─────────────────────────────────────────────
+      - name: Run price_collector (backfill 365 days)
+        if: github.event.inputs.worker == 'price_collector_backfill'
+        env:
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TV_USERNAME:               ${{ secrets.TV_USERNAME }}
+          TV_PASSWORD:               ${{ secrets.TV_PASSWORD }}
+        run: python price_collector.py --backfill
 
       # ── event_detector ───────────────────────────────────────────────────────
       - name: Run event_detector

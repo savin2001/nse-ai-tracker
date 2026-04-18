@@ -8,6 +8,7 @@ Schedule: 09:00, 12:00, 15:00, 17:30 EAT (Mon-Fri)
 Credentials: TV_USERNAME and TV_PASSWORD env vars (free TradingView account).
 """
 import os
+import sys
 import time
 from datetime import date, timedelta
 
@@ -37,9 +38,9 @@ _tv: TvDatafeed = None
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=3, max=20))
-def fetch_ticker(symbol: str, start: date, end: date) -> pd.DataFrame:
+def fetch_ticker(symbol: str, start: date, end: date, n_bars: int = 20) -> pd.DataFrame:
     """Download a single NSE ticker from TradingView (exchange NSEKE)."""
-    df = _tv.get_hist(symbol=symbol, exchange="NSEKE", interval=Interval.in_daily, n_bars=20)
+    df = _tv.get_hist(symbol=symbol, exchange="NSEKE", interval=Interval.in_daily, n_bars=n_bars)
     if df is None or df.empty:
         return pd.DataFrame()
     df.columns = [c.lower() for c in df.columns]
@@ -64,7 +65,7 @@ def build_rows(symbol: str, df: pd.DataFrame) -> list[dict]:
     return rows
 
 
-def run():
+def run(backfill: bool = False):
     global _tv
     _tv = TvDatafeed(
         username=os.environ.get("TV_USERNAME", ""),
@@ -73,12 +74,19 @@ def run():
 
     db    = get_db()
     end   = date.today()
-    start = end - timedelta(days=10)  # buffer to catch weekends and holidays
+
+    if backfill:
+        n_bars = 400            # ~400 trading days covers a full year comfortably
+        start  = end - timedelta(days=365)
+        log.info("backfill_mode", n_bars=n_bars, start=str(start), end=str(end))
+    else:
+        n_bars = 20
+        start  = end - timedelta(days=10)  # buffer to catch weekends and holidays
 
     total_rows = 0
     for symbol in NSE_TICKERS:
         try:
-            df = fetch_ticker(symbol, start, end)
+            df = fetch_ticker(symbol, start, end, n_bars=n_bars)
             if df.empty:
                 log.warning("no_data", ticker=symbol)
                 continue
@@ -94,8 +102,9 @@ def run():
         finally:
             time.sleep(1)
 
-    log.info("price_collection_complete", total_rows=total_rows)
+    log.info("price_collection_complete", total_rows=total_rows, backfill=backfill)
 
 
 if __name__ == "__main__":
-    run()
+    backfill = "--backfill" in sys.argv
+    run(backfill=backfill)
