@@ -59,14 +59,19 @@ app.use(helmet({
 }));
 
 // ── CORS — locked to configured origins ───────────────────────────────────────
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000")
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
-  .map(o => o.trim());
+  .map(o => o.trim())
+  .filter(Boolean);
 
 app.use(cors({
   origin(origin, cb) {
-    // Allow server-to-server (no origin header) and configured origins
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // If ALLOWED_ORIGINS is not configured, allow all origins (open API).
+    // Once the Netlify URL is known, set ALLOWED_ORIGINS on Render to lock it down.
+    if (!allowedOrigins.length) return cb(null, true);
+    // Always allow server-to-server requests (no origin header)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error(`CORS: origin '${origin}' not allowed`));
   },
   credentials: true,
