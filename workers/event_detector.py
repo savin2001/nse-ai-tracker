@@ -1,24 +1,34 @@
 """
 NSE Event Detector
-Scans news_articles and stock_prices for significant events,
-classifies them, and stores in nse.detected_events.
+Fetches live prices directly from TradingView (tvdatafeed) and scans
+news_articles for significant events, then stores results in nse.detected_events.
 
-Schedule: every hour (Mon-Fri)
-Model:    claude-haiku-4-5-20251001 — fast & cheap for classification-only tasks.
-          Pattern matching handles most events; Haiku is used only when a
-          headline matches multiple patterns and we need a single best category.
+Price events are detected from live TradingView data so the worker runs
+independently — it doesn't depend on price_collector having run first.
+Falls back to cached stock_prices if TV credentials are absent.
+
+Deduplication: skips events with the same ticker + event_type already
+inserted today so repeated runs don't create duplicates.
+
+Schedule: every 2 h during market hours (Mon-Fri)
+Model:    claude-haiku-4-5-20251001 — fast & cheap for classification-only.
 """
 import json
+import os
+import time
 from datetime import date, timedelta
 
 import structlog
 from dotenv import load_dotenv
+from tvDatafeed import TvDatafeed, Interval
 
 from services.ai import HAIKU, UsageRecord, calculate_cost, get_ai, log_usage
 from services.db import get_db, nse
 
 load_dotenv()
 log = structlog.get_logger()
+
+_tv: TvDatafeed = None
 
 # ── Haiku classification prompt (used when ≥2 patterns match) ─────────────────
 CLASSIFY_PROMPT = """You are an NSE market analyst. Given a news headline, choose
@@ -45,46 +55,48 @@ NEWS_PATTERNS: list[tuple[str, list[str], str]] = [
 ]
 
 # Price-based event thresholds
-PRICE_SPIKE_PCT   = 5.0   # >5% single-day move
-VOLUME_SURGE_MULT = 3.0   # >3x 20-day average volume
+PRICE_SPIKE_PCT   = 5.0   # >5% single-day move triggers an alert
+VOLUME_SURGE_MULT = 3.0   # >3x rolling-average volume triggers an alert
 
 
-def detect_news_events(articles: list[dict]) -> list[dict]:
-    events = []
-    for article in articles:
-        title = (article.get("title") or "").lower()
-        ticker   = article.get("ticker")
-        if not ticker or not title:
-            continue
+# ── Live price fetching ────────────────────────────────────────────────────────
 
-        for event_type, keywords, severity in NEWS_PATTERNS:
-            if any(kw in title for kw in keywords):
-                events.append({
-                    "ticker":      ticker,
-                    "event_type":  event_type,
-                    "severity":    severity,
-                    "description": f"[news] {article.get('title', '')[:250]}",
-                    "metadata":    {
-                        "source":       article.get("source"),
-                        "url":          article.get("url"),
-                        "published_at": article.get("published_at"),
-                        "sentiment_score": article.get("sentiment_score"),
-                    },
-                })
-                break  # one event per article
-    return events
+def fetch_prices_live(ticker: str, n_bars: int = 25) -> list[dict]:
+    """Fetch the most recent daily bars from TradingView (newest-first)."""
+    try:
+        df = _tv.get_hist(
+            symbol=ticker, exchange="NSEKE",
+            interval=Interval.in_daily, n_bars=n_bars,
+        )
+        if df is None or df.empty:
+            return []
+        df.columns = [c.lower() for c in df.columns]
+        rows = []
+        for dt, row in df.iterrows():
+            rows.append({
+                "date":   str(dt.date()),
+                "close":  round(float(row.get("close",  0) or 0), 2),
+                "volume": int(row.get("volume", 0) or 0),
+            })
+        rows.reverse()          # put newest first, matching DB query order
+        return rows
+    except Exception as exc:
+        log.warning("tv_fetch_failed", ticker=ticker, error=str(exc))
+        return []
 
+
+# ── Event detection ────────────────────────────────────────────────────────────
 
 def detect_price_events(ticker: str, prices: list[dict]) -> list[dict]:
-    """Detect price spikes and volume surges from recent OHLCV rows."""
-    if len(prices) < 21:
+    """Detect price spikes and volume surges from OHLCV rows (newest first)."""
+    if len(prices) < 2:
         return []
 
     events = []
     latest = prices[0]
     prev   = prices[1]
 
-    # Price spike
+    # Price spike — only needs two bars
     if prev["close"] and prev["close"] > 0:
         pct = (latest["close"] - prev["close"]) / prev["close"] * 100
         if abs(pct) >= PRICE_SPIKE_PCT:
@@ -97,9 +109,10 @@ def detect_price_events(ticker: str, prices: list[dict]) -> list[dict]:
                 "metadata":    {"pct_change": round(pct, 2), "date": latest["date"]},
             })
 
-    # Volume surge (compare latest vs 20-day avg)
-    volumes = [p["volume"] for p in prices[1:21] if p.get("volume")]
-    if volumes and latest.get("volume"):
+    # Volume surge — use however many prior bars we have (up to 20)
+    lookback = min(len(prices) - 1, 20)
+    volumes  = [p["volume"] for p in prices[1:lookback + 1] if p.get("volume")]
+    if len(volumes) >= 5 and latest.get("volume"):
         avg_vol = sum(volumes) / len(volumes)
         if avg_vol > 0 and latest["volume"] / avg_vol >= VOLUME_SURGE_MULT:
             ratio = round(latest["volume"] / avg_vol, 1)
@@ -107,7 +120,7 @@ def detect_price_events(ticker: str, prices: list[dict]) -> list[dict]:
                 "ticker":      ticker,
                 "event_type":  "volume_surge",
                 "severity":    "medium",
-                "description": f"Volume {ratio}x above 20-day average on {latest['date']}",
+                "description": f"Volume {ratio}x above {lookback}-day average on {latest['date']}",
                 "metadata":    {"vol_ratio": ratio, "date": latest["date"]},
             })
 
@@ -120,10 +133,8 @@ def classify_with_haiku(
     title: str,
     ticker: str,
 ) -> tuple[str, str]:
-    """
-    Use Haiku to pick the best event_type when ≥2 patterns match.
-    Returns (event_type, severity). Falls back to ('other', 'low') on error.
-    """
+    """Use Haiku to pick the best event_type when ≥2 patterns match.
+    Returns (event_type, severity). Falls back to ('other', 'low') on error."""
     try:
         msg = ai.messages.create(
             model=HAIKU,
@@ -155,8 +166,8 @@ def detect_news_events(
 ) -> list[dict]:
     events = []
     for article in articles:
-        title = (article.get("title") or "").lower()
-        ticker   = article.get("ticker")
+        title  = (article.get("title") or "").lower()
+        ticker = article.get("ticker")
         if not ticker or not title:
             continue
 
@@ -172,7 +183,6 @@ def detect_news_events(
         if len(matches) == 1 or ai is None:
             event_type, severity = matches[0]
         else:
-            # Multiple patterns matched — use Haiku to pick the best one
             event_type, severity = classify_with_haiku(
                 ai, schema, article.get("title", ""), ticker
             )
@@ -183,21 +193,34 @@ def detect_news_events(
             "severity":    severity,
             "description": f"[news] {article.get('title', '')[:250]}",
             "metadata":    {
-                "source":       article.get("source"),
-                "url":          article.get("url"),
-                "published_at": article.get("published_at"),
+                "source":          article.get("source"),
+                "url":             article.get("url"),
+                "published_at":    article.get("published_at"),
                 "sentiment_score": article.get("sentiment_score"),
             },
         })
     return events
 
 
+# ── Worker entrypoint ─────────────────────────────────────────────────────────
+
 def run() -> None:
+    global _tv
     db     = get_db()
     ai     = get_ai()
     schema = nse(db)
     cutoff = str(date.today() - timedelta(days=2))
+    today  = str(date.today())
     total  = 0
+
+    # Connect to TradingView for live price fetching
+    tv_user = os.environ.get("TV_USERNAME", "")
+    tv_pass = os.environ.get("TV_PASSWORD", "")
+    if tv_user and tv_pass:
+        _tv = TvDatafeed(username=tv_user, password=tv_pass)
+        log.info("tv_connected", mode="live")
+    else:
+        log.warning("tv_creds_missing", fallback="cached stock_prices")
 
     companies = schema.table("companies").select("ticker").execute().data
 
@@ -216,20 +239,35 @@ def run() -> None:
         news_events = detect_news_events(articles, ai=ai, schema=schema)
 
         # ── Price-based events ────────────────────────────────────────────
-        prices = (
-            schema.table("stock_prices")
-            .select("ticker, date, close, volume")
-            .eq("ticker", ticker)
-            .order("date", desc=True)
-            .limit(22)
-            .execute()
-            .data
-        )
+        if _tv:
+            prices = fetch_prices_live(ticker)
+            time.sleep(0.5)     # stay within TradingView rate limits
+        else:
+            prices = (
+                schema.table("stock_prices")
+                .select("date, close, volume")
+                .eq("ticker", ticker)
+                .order("date", desc=True)
+                .limit(25)
+                .execute()
+                .data
+            )
         price_events = detect_price_events(ticker, prices)
 
-        all_events = news_events + price_events
-        for evt in all_events:
+        # ── Insert, skipping today's duplicates ───────────────────────────
+        for evt in news_events + price_events:
             try:
+                existing = (
+                    schema.table("detected_events")
+                    .select("id")
+                    .eq("ticker", ticker)
+                    .eq("event_type", evt["event_type"])
+                    .gte("detected_at", today)
+                    .execute()
+                    .data
+                )
+                if existing:
+                    continue
                 schema.table("detected_events").insert(evt).execute()
                 total += 1
             except Exception as exc:
