@@ -127,7 +127,7 @@ export default function AIAnalysis({ stock }: Props) {
               <p className="text-sm text-gray-300 leading-relaxed">{analysis.summary}</p>
 
               {/* Target + horizon */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-3">
                   <div className="flex items-center gap-1.5 mb-1">
                     <Target size={12} className="text-gray-500" />

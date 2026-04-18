@@ -213,7 +213,7 @@ export default function PortfolioPage() {
   const isUnder = totalWeight < 0.995 && allocs.length > 0;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { motion } from "motion/react";
 import {
   LayoutDashboard, BriefcaseBusiness, Bell,
-  Settings, TrendingUp, LogOut, Activity,
+  Settings, TrendingUp, LogOut, Activity, X,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -13,24 +13,37 @@ const LINKS = [
   { to: "/settings",   icon: Settings,          label: "Settings"  },
 ];
 
-export default function Sidebar() {
+interface Props {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: Props) {
   const { signOut, user } = useAuth();
   const initials = (user?.email ?? "?").slice(0, 2).toUpperCase();
   const handle   = user?.email?.split("@")[0] ?? "";
 
-  return (
-    <aside className="hidden md:flex flex-col w-[224px] min-h-screen border-r border-white/5 px-3 py-5"
-      style={{ background: "#060606" }}>
-
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-2 mb-8">
-        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-          <TrendingUp size={13} className="text-emerald-400" strokeWidth={2.5} />
+  const inner = (
+    <aside
+      className="flex flex-col w-[224px] min-h-screen border-r border-white/5 px-3 py-5"
+      style={{ background: "#060606" }}
+    >
+      {/* Logo + mobile close */}
+      <div className="flex items-center justify-between px-2 mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+            <TrendingUp size={13} className="text-emerald-400" strokeWidth={2.5} />
+          </div>
+          <div>
+            <span className="text-sm font-bold text-white tracking-tight block leading-none">NSE AI</span>
+            <span className="text-[9px] text-gray-600 font-mono uppercase tracking-wider">Tracker</span>
+          </div>
         </div>
-        <div>
-          <span className="text-sm font-bold text-white tracking-tight block leading-none">NSE AI</span>
-          <span className="text-[9px] text-gray-600 font-mono uppercase tracking-wider">Tracker</span>
-        </div>
+        {onClose && (
+          <button onClick={onClose} className="md:hidden text-gray-500 hover:text-white p-1">
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Section label */}
@@ -42,6 +55,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               `group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                 isActive
@@ -98,5 +112,21 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible md+ */}
+      <div className="hidden md:block">{inner}</div>
+
+      {/* Mobile drawer — slides in from left */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 md:hidden transition-transform duration-300 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {inner}
+      </div>
+    </>
   );
 }

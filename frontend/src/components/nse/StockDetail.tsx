@@ -145,7 +145,7 @@ export default function StockDetail({ stock, onClose }: Props) {
           <BarChart2 size={14} className="text-gray-500" />
           <span className="text-xs font-mono text-gray-500 uppercase tracking-widest">Key Statistics</span>
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 gap-x-6 gap-y-4">
           <Stat label="Market Cap" value={`KES ${stock.marketCap}B`} />
           <Stat label="Volume" value={formatVolume(stock.volume)} />
           <Stat label="52W High" value={`KES ${stock.high52w}`} />

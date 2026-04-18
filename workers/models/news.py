@@ -16,12 +16,12 @@ class NewsArticle(BaseModel):
 
     def to_db_row(self) -> dict:
         return {
-            "ticker": self.ticker,
-            "headline": self.headline,
-            "source": self.source,
-            "url": self.url,
-            "published_at": self.published_at.isoformat() if self.published_at else None,
-            "sentiment": self.sentiment,
-            "summary": self.summary,
-            "raw_text": self.raw_text,
+            "ticker":          self.ticker,
+            "title":           self.headline,       # DB column is "title"
+            "source":          self.source,
+            "url":             self.url,
+            "published_at":    self.published_at.isoformat() if self.published_at else None,
+            "sentiment_score": self.sentiment,      # DB column is "sentiment_score"
+            "summary":         self.summary,
+            "content":         self.raw_text,       # DB column is "content"
         }
