@@ -215,9 +215,9 @@ def run() -> None:
 
     # Connect to TradingView for live price fetching
     tv_user = os.environ.get("TV_USERNAME", "")
-    tv_pass = os.environ.get("TV_PASSWORD", "")
+    tv_pass = os.environ.get("TV_PASSWORD", "")  # pragma: allowlist secret
     if tv_user and tv_pass:
-        _tv = TvDatafeed(username=tv_user, password=tv_pass)
+        _tv = TvDatafeed(username=tv_user, password=tv_pass)  # pragma: allowlist secret
         log.info("tv_connected", mode="live")
     else:
         log.warning("tv_creds_missing", fallback="cached stock_prices")
