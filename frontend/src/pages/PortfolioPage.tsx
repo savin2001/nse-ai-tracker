@@ -129,11 +129,11 @@ function AddPositionForm({ onAdd }: { onAdd: (ticker: string, weight: number) =>
       <AnimatePresence>
         {open && (
           <motion.form
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
             onSubmit={submit}
-            className="overflow-hidden"
           >
             <div className="flex gap-2 mt-3">
               <CompanySearch
