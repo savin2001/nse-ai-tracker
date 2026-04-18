@@ -122,7 +122,7 @@ def run():
             try:
                 schema.table("news_articles").upsert(
                     article.to_db_row(),
-                    on_conflict="ticker,url",
+                    on_conflict="url",   # url is the single UNIQUE column in the DB
                 ).execute()
                 inserted += 1
             except Exception as exc:
