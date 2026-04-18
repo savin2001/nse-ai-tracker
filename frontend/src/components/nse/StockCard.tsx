@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import type { NSEStock } from "../../data/nseData";
+import type { NSEStock, PricePoint } from "../../data/nseData";
 import { formatVolume } from "../../data/nseData";
 import StockChart from "./StockChart";
 import { api } from "../../api/client";
-import type { PricePoint } from "../../data/nseData";
 
 interface Props {
   stock: NSEStock;
@@ -28,17 +27,25 @@ export default function StockCard({ stock, onClick, selected, index }: Props) {
     return () => { cancelled = true; };
   }, [stock.symbol]);
 
-  const isUp = stock.changePercent >= 0;
+  // Derive live price + change from fetched history; fall back to static data
+  const livePrice      = sparkHistory ? sparkHistory[sparkHistory.length - 1]?.close : null;
+  const livePrevClose  = sparkHistory && sparkHistory.length >= 2
+    ? sparkHistory[sparkHistory.length - 2]?.close : null;
+  const liveChangePct  = livePrice && livePrevClose && livePrevClose > 0
+    ? ((livePrice - livePrevClose) / livePrevClose) * 100 : null;
 
-  // Directional colours
-  const tickerClass   = isUp
+  const displayPrice  = livePrice  ?? stock.price;
+  const displayChange = liveChangePct ?? stock.changePercent;
+  const isUp = displayChange >= 0;
+
+  const tickerClass = isUp
     ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-    : "text-red-400    bg-red-500/10    border-red-500/20";
-  const changeClass   = isUp ? "text-emerald-400" : "text-red-400";
-  const borderSel     = isUp ? "border-emerald-500/40" : "border-red-500/40";
-  const bgSel         = isUp ? "bg-emerald-500/5"      : "bg-red-500/5";
-  const glowColor     = isUp ? "rgba(16,185,129,0.14)"  : "rgba(239,68,68,0.14)";
-  const hoverGlow     = isUp
+    : "text-red-400 bg-red-500/10 border-red-500/20";
+  const changeClass = isUp ? "text-emerald-400" : "text-red-400";
+  const borderSel   = isUp ? "border-emerald-500/40" : "border-red-500/40";
+  const bgSel       = isUp ? "bg-emerald-500/5"      : "bg-red-500/5";
+  const glowColor   = isUp ? "rgba(16,185,129,0.14)" : "rgba(239,68,68,0.14)";
+  const hoverGlow   = isUp
     ? "radial-gradient(circle at 50% 0%, rgba(16,185,129,0.10) 0%, transparent 70%)"
     : "radial-gradient(circle at 50% 0%, rgba(239,68,68,0.10) 0%, transparent 70%)";
 
@@ -57,25 +64,24 @@ export default function StockCard({ stock, onClick, selected, index }: Props) {
       }`}
       style={selected ? { boxShadow: `0 0 28px ${glowColor}` } : undefined}
     >
-      {/* Hover glow overlay */}
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{ background: hoverGlow }}
       />
 
       <div className="relative">
-        {/* Header row */}
+        {/* Header */}
         <div className="flex items-start justify-between mb-1">
           <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${tickerClass}`}>
             {stock.symbol}
           </span>
           <div className="text-right">
             <p className="text-base font-bold text-white tabular-nums leading-none">
-              {stock.price.toFixed(2)}
+              {displayPrice.toFixed(2)}
             </p>
             <p className={`flex items-center justify-end gap-0.5 text-[10px] font-mono font-semibold mt-0.5 ${changeClass}`}>
               {isUp ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
-              {isUp ? "+" : ""}{stock.changePercent.toFixed(2)}%
+              {isUp ? "+" : ""}{displayChange.toFixed(2)}%
             </p>
           </div>
         </div>
