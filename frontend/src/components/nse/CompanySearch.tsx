@@ -8,6 +8,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { api, type Company } from "../../api/client";
+import { NSE_STOCKS } from "../../data/nseData";
+
+// Static fallback — always available, used when the API is unreachable.
+const STATIC_COMPANIES: Company[] = NSE_STOCKS.map(s => ({
+  ticker:     s.symbol,
+  name:       s.name,
+  sector:     s.sector,
+  market_cap: s.marketCap,
+  high_52w:   s.high52w,
+  low_52w:    s.low52w,
+}));
 
 // Module-level cache so the company list is only fetched once per session.
 let _cache: Company[] | null = null;
@@ -16,11 +27,17 @@ let _inflight: Promise<Company[]> | null = null;
 async function fetchCompanies(): Promise<Company[]> {
   if (_cache) return _cache;
   if (_inflight) return _inflight;
-  _inflight = api.stocks.list().then(data => {
-    _cache = data;
-    _inflight = null;
-    return data;
-  });
+  _inflight = api.stocks.list()
+    .then(data => {
+      _cache = data.length ? data : STATIC_COMPANIES;
+      _inflight = null;
+      return _cache;
+    })
+    .catch(() => {
+      _cache = STATIC_COMPANIES;
+      _inflight = null;
+      return STATIC_COMPANIES;
+    });
   return _inflight;
 }
 

@@ -35,7 +35,9 @@ jobs:
             exit 0
           fi
           echo "Triggering Render deploy…"
-          RESPONSE=$(curl -fsSL --retry 3 -X POST "$RENDER_DEPLOY_HOOK_URL")
+          RESPONSE=$(curl -fsSL --retry 3 -X POST "$RENDER_DEPLOY_HOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{}')
           echo "Response: $RESPONSE"
           echo "$RESPONSE" | python3 -c "
           import sys, json
