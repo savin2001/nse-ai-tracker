@@ -296,7 +296,7 @@ export default function DashboardPage() {
                     key={stock.symbol}
                     stock={stock}
                     index={i}
-                    days={90}
+                    days={450}
                     selected={selected?.symbol === stock.symbol}
                     onClick={() => setSelected(prev => prev?.symbol === stock.symbol ? null : stock)}
                   />
@@ -309,7 +309,7 @@ export default function DashboardPage() {
                   <StockDetail
                     stock={selected}
                     onClose={() => setSelected(null)}
-                    days={90}
+                    days={450}
                   />
                 </div>
               )}
