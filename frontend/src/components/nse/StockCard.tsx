@@ -26,7 +26,7 @@ export default function StockCard({ stock, onClick, selected, index, days = 30 }
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [stock.symbol]);
+  }, [stock.symbol, days]);
 
   // Derive live price + change from fetched history; fall back to static data
   const livePrice      = sparkHistory ? sparkHistory[sparkHistory.length - 1]?.close : null;
