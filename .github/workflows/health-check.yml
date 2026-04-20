@@ -61,11 +61,16 @@ jobs:
 
       - name: Check frontend availability
         id: frontend_health
-        if: ${{ secrets.FRONTEND_URL != '' }}
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         run: |
-          echo "Calling ${{ secrets.FRONTEND_URL }} ..."
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "FRONTEND_URL not set — skipping"
+            exit 0
+          fi
+          echo "Calling $FRONTEND_URL ..."
           HTTP_CODE=$(curl -o /dev/null -sw "%{http_code}" --max-time 10 \
-            "${{ secrets.FRONTEND_URL }}" || echo "000")
+            "$FRONTEND_URL" || echo "000")
           echo "http_code=$HTTP_CODE" >> "$GITHUB_OUTPUT"
           echo "Frontend HTTP: $HTTP_CODE"
           [[ "$HTTP_CODE" =~ ^2 ]] || { echo "::error::Frontend returned HTTP $HTTP_CODE"; exit 1; }
