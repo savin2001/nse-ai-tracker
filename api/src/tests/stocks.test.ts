@@ -44,8 +44,8 @@ describe("GET /stocks/:ticker/prices", () => {
     expect(res.status).toBe(400);
   });
 
-  it("rejects days > 365 with 400", async () => {
-    const res = await request(app).get("/SCOM/prices?days=500");
+  it("rejects days > 600 with 400", async () => {
+    const res = await request(app).get("/SCOM/prices?days=601");
     expect(res.status).toBe(400);
   });
 
