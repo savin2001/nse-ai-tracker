@@ -3,7 +3,6 @@ name: Workers
 # ── Triggers ──────────────────────────────────────────────────────────────────
 on:
   # Manual run — pick a single worker or run all of them.
-  # Use this to seed the DB on first deploy or re-run on demand.
   workflow_dispatch:
     inputs:
       worker:
@@ -20,23 +19,30 @@ on:
           - ai_worker
           - email_worker
 
-  # Scheduled runs (all times UTC — NSE is UTC+3 / EAT)
-  # Price collection: 06:00 + 12:00 UTC = 09:00 + 15:00 EAT
-  # News + events:    05:30–14:30 UTC every 2 h = 08:30–17:30 EAT
-  # AI analysis:      15:00 UTC        = 18:00 EAT (after market close)
-  # Email digest:     15:30 UTC        = 18:30 EAT (after AI analysis)
+  # Scheduled runs — all within the NSE active window
+  #
+  # NSE market hours : 09:00–15:00 EAT (06:00–12:00 UTC)
+  # Active window    : 08:00–16:00 EAT (05:00–13:00 UTC)  ← 1 h buffer each side
+  #
+  # 05:00 UTC = 08:00 EAT  pre-market price snapshot   (1 h before open)
+  # 06:00 UTC = 09:00 EAT  price at market open
+  # 12:00 UTC = 15:00 EAT  price at market close
+  # 05:30–11:30 UTC        news + events every 2 h     (08:30–14:30 EAT)
+  # 13:00 UTC = 16:00 EAT  post-close chain            (1 h after close)
+  #                         price → news → events → ai_worker → email
   schedule:
-    - cron: "0 6  * * 1-5"   # price_collector  — morning run
-    - cron: "0 12 * * 1-5"   # price_collector  — afternoon run
-    - cron: "30 5,7,9,11,13 * * 1-5"  # news_fetcher + event_detector — every 2 h
-    - cron: "0 15 * * 1-5"   # ai_worker        — post-close analysis
+    - cron: "0 5  * * 1-5"            # price_collector — pre-market 08:00 EAT
+    - cron: "0 6  * * 1-5"            # price_collector — market open 09:00 EAT
+    - cron: "0 12 * * 1-5"            # price_collector — market close 15:00 EAT
+    - cron: "30 5,7,9,11 * * 1-5"    # news + events   — every 2 h 08:30–14:30 EAT
+    - cron: "0 13 * * 1-5"            # post-close chain — 16:00 EAT (end of window)
 
 # ── Job ───────────────────────────────────────────────────────────────────────
 jobs:
   run-workers:
     name: Run ${{ github.event.inputs.worker || 'scheduled' }} workers
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     defaults:
       run:
@@ -55,11 +61,14 @@ jobs:
         run: pip install -r requirements.txt
 
       # ── price_collector ──────────────────────────────────────────────────────
+      # Runs on: morning, midday, post-close chain, manual
       - name: Run price_collector
         if: |
           github.event_name == 'schedule' && (
-            github.event.schedule == '0 6 * * 1-5' ||
-            github.event.schedule == '0 12 * * 1-5'
+            github.event.schedule == '0 5 * * 1-5'  ||
+            github.event.schedule == '0 6 * * 1-5'  ||
+            github.event.schedule == '0 12 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5'
           ) ||
           github.event.inputs.worker == 'price_collector' ||
           github.event.inputs.worker == 'all'
@@ -81,10 +90,13 @@ jobs:
         run: python price_collector.py --backfill
 
       # ── news_fetcher ─────────────────────────────────────────────────────────
+      # Runs on: intraday every-2h sweep, post-close chain, manual
       - name: Run news_fetcher
         if: |
-          github.event_name == 'schedule' &&
-            github.event.schedule == '30 5,7,9,11,13 * * 1-5' ||
+          github.event_name == 'schedule' && (
+            github.event.schedule == '30 5,7,9,11 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5'
+          ) ||
           github.event.inputs.worker == 'news_fetcher' ||
           github.event.inputs.worker == 'all'
         env:
@@ -93,10 +105,13 @@ jobs:
         run: python news_fetcher.py
 
       # ── event_detector ───────────────────────────────────────────────────────
+      # Runs on: intraday every-2h sweep, post-close chain, manual
       - name: Run event_detector
         if: |
-          github.event_name == 'schedule' &&
-            github.event.schedule == '30 5,7,9,11,13 * * 1-5' ||
+          github.event_name == 'schedule' && (
+            github.event.schedule == '30 5,7,9,11 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5'
+          ) ||
           github.event.inputs.worker == 'event_detector' ||
           github.event.inputs.worker == 'all'
         env:
@@ -108,10 +123,11 @@ jobs:
         run: python event_detector.py
 
       # ── ai_worker ────────────────────────────────────────────────────────────
+      # Runs on: post-close chain only (needs final prices + news), manual
       - name: Run ai_worker
         if: |
           github.event_name == 'schedule' &&
-            github.event.schedule == '0 15 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5' ||
           github.event.inputs.worker == 'ai_worker' ||
           github.event.inputs.worker == 'all'
         env:
@@ -121,8 +137,12 @@ jobs:
         run: python ai_worker.py
 
       # ── email_worker ─────────────────────────────────────────────────────────
+      # Runs LAST in the post-close chain — always has fresh prices, news,
+      # events, and AI signals because the steps above complete first.
       - name: Run email_worker
         if: |
+          github.event_name == 'schedule' &&
+            github.event.schedule == '0 13 * * 1-5' ||
           github.event.inputs.worker == 'email_worker' ||
           github.event.inputs.worker == 'all'
         env:

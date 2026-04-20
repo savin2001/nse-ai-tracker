@@ -13,27 +13,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate config
+        run: |
+          if [ -z "${{ secrets.API_BASE_URL }}" ]; then
+            echo "::error::API_BASE_URL secret is not set — add it under Settings → Secrets → Actions"
+            exit 1
+          fi
+          if [ -z "${{ secrets.FRONTEND_URL }}" ]; then
+            echo "::warning::FRONTEND_URL secret is not set — skipping frontend check"
+          fi
+          echo "Config OK — targets are configured"
+
       - name: Check API /health
         id: api_health
         run: |
-          STATUS=$(curl -sf --max-time 10 "${{ vars.API_BASE_URL }}/health" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unreachable")
+          echo "Calling ${{ secrets.API_BASE_URL }}/health ..."
+          HTTP_CODE=$(curl -o /tmp/health.json -sw "%{http_code}" --max-time 10 \
+            "${{ secrets.API_BASE_URL }}/health" || echo "000")
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "000" ]; then
+            echo "::error::API unreachable — curl could not connect (timeout or DNS failure)"
+            echo "status=unreachable" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::API returned HTTP $HTTP_CODE"
+            cat /tmp/health.json || true
+            echo "status=http-$HTTP_CODE" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          STATUS=$(python3 -c "import sys,json; d=json.load(open('/tmp/health.json')); print(d.get('status','unknown'))" 2>/dev/null || echo "parse-error")
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "API health: $STATUS"
-          [ "$STATUS" = "ok" ] || exit 1
+          cat /tmp/health.json
+
+          [ "$STATUS" = "ok" ] || { echo "::error::API status is '$STATUS', expected 'ok'"; exit 1; }
 
       - name: Check API /health/detailed
         id: api_detailed
         if: success()
         run: |
-          curl -sf --max-time 15 "${{ vars.API_BASE_URL }}/health/detailed" | python3 -m json.tool
+          echo "Calling ${{ secrets.API_BASE_URL }}/health/detailed ..."
+          curl -sf --max-time 15 "${{ secrets.API_BASE_URL }}/health/detailed" | python3 -m json.tool
 
       - name: Check frontend availability
         id: frontend_health
+        if: ${{ secrets.FRONTEND_URL != '' }}
         run: |
-          HTTP_CODE=$(curl -o /dev/null -sw "%{http_code}" --max-time 10 "${{ vars.FRONTEND_URL }}" || echo "000")
+          echo "Calling ${{ secrets.FRONTEND_URL }} ..."
+          HTTP_CODE=$(curl -o /dev/null -sw "%{http_code}" --max-time 10 \
+            "${{ secrets.FRONTEND_URL }}" || echo "000")
           echo "http_code=$HTTP_CODE" >> "$GITHUB_OUTPUT"
           echo "Frontend HTTP: $HTTP_CODE"
-          [[ "$HTTP_CODE" =~ ^2 ]] || exit 1
+          [[ "$HTTP_CODE" =~ ^2 ]] || { echo "::error::Frontend returned HTTP $HTTP_CODE"; exit 1; }
 
       - name: Notify on failure
         if: failure()

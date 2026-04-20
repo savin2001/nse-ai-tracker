@@ -8,12 +8,10 @@ interface Props {
 }
 
 export default function StockChart({ history, height = 120, showAxes = false }: Props) {
-  const points = history.slice(-60);
-
   const { min, max, svgPoints, areaPoints } = useMemo(() => {
-    if (points.length === 0) return { min: 0, max: 0, svgPoints: "", areaPoints: "" };
+    if (history.length === 0) return { min: 0, max: 0, svgPoints: "", areaPoints: "" };
 
-    const closes = points.map((p) => p.close);
+    const closes = history.map((p) => p.close);
     const minVal = Math.min(...closes);
     const maxVal = Math.max(...closes);
     const range = maxVal - minVal || 1;
@@ -34,9 +32,9 @@ export default function StockChart({ history, height = 120, showAxes = false }: 
       ` L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`;
 
     return { min: minVal, max: maxVal, svgPoints: line, areaPoints: area };
-  }, [points, height, showAxes]);
+  }, [history, height, showAxes]);
 
-  const isUp = points.length >= 2 && points[points.length - 1].close >= points[0].close;
+  const isUp = history.length >= 2 && history[history.length - 1].close >= history[0].close;
   const color = isUp ? "#34d399" : "#f87171";
   const gradId = `grad-${Math.random().toString(36).slice(2, 7)}`;
 

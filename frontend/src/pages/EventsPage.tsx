@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Bell, AlertCircle, RefreshCw, Filter } from "lucide-react";
-import { api, type MarketEvent } from "../api/client";
+import { Bell, AlertCircle, RefreshCw, Filter, Newspaper, ExternalLink } from "lucide-react";
+import { api, type MarketEvent, type NewsArticle } from "../api/client";
 import CompanySearch from "../components/nse/CompanySearch";
 
 const SEVERITY_CONFIG = {
@@ -57,6 +57,51 @@ function EventCard({ event }: { event: MarketEvent }) {
   );
 }
 
+const SENTIMENT_LABEL: Record<string, { text: string; cls: string }> = {
+  positive: { text: "Positive", cls: "text-emerald-400" },
+  negative: { text: "Negative", cls: "text-red-400"     },
+  neutral:  { text: "Neutral",  cls: "text-gray-500"    },
+};
+
+function sentimentKey(score: number | null): string {
+  if (score === null) return "neutral";
+  if (score > 0.1)   return "positive";
+  if (score < -0.1)  return "negative";
+  return "neutral";
+}
+
+function NewsCard({ article }: { article: NewsArticle }) {
+  const snt = SENTIMENT_LABEL[sentimentKey(article.sentiment_score)];
+  const dt  = new Date(article.published_at);
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/14 transition-colors group">
+      <Newspaper size={13} className="text-gray-500 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-300 leading-snug group-hover:text-white transition-colors line-clamp-2">
+          {article.title}
+        </p>
+        <div className="flex items-center gap-3 mt-1.5">
+          <span className="text-[10px] font-mono font-bold text-emerald-400">{article.ticker}</span>
+          {article.source && (
+            <span className="text-[10px] text-gray-600 truncate">{article.source}</span>
+          )}
+          <span className={`text-[10px] font-mono ml-auto ${snt.cls}`}>{snt.text}</span>
+          <span className="text-[10px] text-gray-700 font-mono">{formatRelative(dt)}</span>
+        </div>
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 mt-1.5 text-[10px] font-mono text-gray-600 hover:text-emerald-400 transition-colors truncate"
+        >
+          <ExternalLink size={9} className="shrink-0" />
+          {article.url}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function formatRelative(dt: Date): string {
   const diff = (Date.now() - dt.getTime()) / 1000;
   if (diff < 60)   return `${Math.round(diff)}s ago`;
@@ -69,6 +114,7 @@ const SEVERITIES: Array<MarketEvent["severity"] | "all"> = ["all", "critical", "
 
 export default function EventsPage() {
   const [events, setEvents]     = useState<MarketEvent[]>([]);
+  const [news, setNews]         = useState<NewsArticle[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [severity, setSeverity] = useState<MarketEvent["severity"] | "all">("all");
@@ -80,7 +126,16 @@ export default function EventsPage() {
       const params: Record<string, string> = { limit: "50" };
       if (severity !== "all") params.severity = severity;
       if (ticker.trim()) params.ticker = ticker.trim().toUpperCase();
-      setEvents(await api.events.list(params));
+
+      const newsParams: Record<string, string> = { limit: "20", days: "7" };
+      if (ticker.trim()) newsParams.ticker = ticker.trim().toUpperCase();
+
+      const [eventsData, newsData] = await Promise.all([
+        api.events.list(params),
+        api.news.list(newsParams).catch(() => [] as NewsArticle[]),
+      ]);
+      setEvents(eventsData);
+      setNews(newsData);
     } catch (err: any) {
       setError(err.message ?? "Failed to load events");
     } finally {
@@ -191,6 +246,22 @@ export default function EventsPage() {
         >
           {events.map(e => <EventCard key={e.id} event={e} />)}
         </motion.div>
+      )}
+
+      {/* ── News feed ─────────────────────────────────────────────────────── */}
+      {!loading && news.length > 0 && (
+        <section className="pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 mb-3">
+            <Newspaper size={14} className="text-emerald-400" />
+            <h2 className="text-sm font-semibold text-white">
+              {ticker ? `${ticker} News` : "Market News"} · last 7 days
+            </h2>
+            <span className="text-[10px] text-gray-600 font-mono ml-auto">{news.length} articles</span>
+          </div>
+          <div className="space-y-2">
+            {news.map(a => <NewsCard key={a.id} article={a} />)}
+          </div>
+        </section>
       )}
     </div>
   );
