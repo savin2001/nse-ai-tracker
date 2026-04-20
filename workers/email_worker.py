@@ -89,15 +89,19 @@ def build_digest_html(top5: list[dict], news_by_ticker: dict[str, list[dict]], d
         for n in news_by_ticker.get(ticker, [])[:3]:
             snt_label, snt_color = _sentiment_label(n.get("sentiment_score"))
             source = n.get("source") or ""
+            url    = n.get("url", "")
             news_rows += (
                 f'<tr style="border-bottom:1px solid #27272a;">'
                 f'<td style="padding:8px 12px;">'
-                f'  <a href="{n["url"]}" style="color:#d4d4d8;text-decoration:none;font-size:12px;line-height:1.5;">'
+                f'  <span style="color:#d4d4d8;font-size:12px;line-height:1.5;display:block;">'
                 f'    {n["title"][:110]}'
-                f'  </a>'
+                f'  </span>'
                 f'  <span style="display:block;color:{snt_color};font-size:10px;margin-top:3px;">'
                 f'    {snt_label}{(" · " + source) if source else ""}'
                 f'  </span>'
+                f'  <a href="{url}" style="display:block;color:#52525b;font-size:10px;'
+                f'     font-family:monospace;margin-top:4px;word-break:break-all;'
+                f'     text-decoration:underline;">{url}</a>'
                 f'</td>'
                 f'</tr>'
             )

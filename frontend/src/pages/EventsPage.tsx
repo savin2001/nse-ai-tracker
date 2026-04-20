@@ -74,12 +74,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
   const snt = SENTIMENT_LABEL[sentimentKey(article.sentiment_score)];
   const dt  = new Date(article.published_at);
   return (
-    <a
-      href={article.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/14 transition-colors group"
-    >
+    <div className="flex items-start gap-3 p-3 rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/14 transition-colors group">
       <Newspaper size={13} className="text-gray-500 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-300 leading-snug group-hover:text-white transition-colors line-clamp-2">
@@ -92,10 +87,18 @@ function NewsCard({ article }: { article: NewsArticle }) {
           )}
           <span className={`text-[10px] font-mono ml-auto ${snt.cls}`}>{snt.text}</span>
           <span className="text-[10px] text-gray-700 font-mono">{formatRelative(dt)}</span>
-          <ExternalLink size={10} className="text-gray-700 shrink-0" />
         </div>
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 mt-1.5 text-[10px] font-mono text-gray-600 hover:text-emerald-400 transition-colors truncate"
+        >
+          <ExternalLink size={9} className="shrink-0" />
+          {article.url}
+        </a>
       </div>
-    </a>
+    </div>
   );
 }
 
