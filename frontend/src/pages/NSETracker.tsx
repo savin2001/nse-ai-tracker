@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
 import { NSE_STOCKS, SECTORS, type NSEStock } from "../data/nseData";
@@ -6,11 +6,33 @@ import MarketHeader from "../components/nse/MarketHeader";
 import MarketOverview from "../components/nse/MarketOverview";
 import StockCard from "../components/nse/StockCard";
 import StockDetail from "../components/nse/StockDetail";
+import { api } from "../api/client";
 
 type View = "grid" | "list";
 
-function StockRow({ stock, onClick, selected }: { stock: NSEStock; onClick: () => void; selected: boolean }) {
-  const isUp = stock.changePercent >= 0;
+function StockRow({ stock, onClick, selected, days = 30 }: { stock: NSEStock; onClick: () => void; selected: boolean; days?: number }) {
+  const [livePrice, setLivePrice]   = useState<number | null>(null);
+  const [liveChange, setLiveChange] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.stocks.prices(stock.symbol, days)
+      .then(prices => {
+        if (cancelled || prices.length < 2) return;
+        const asc   = [...prices].reverse();
+        const last  = asc[asc.length - 1].close;
+        const prev  = asc[asc.length - 2].close;
+        setLivePrice(last);
+        setLiveChange(prev > 0 ? ((last - prev) / prev) * 100 : null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [stock.symbol, days]);
+
+  const displayPrice  = livePrice  ?? stock.price;
+  const displayChange = liveChange ?? stock.changePercent;
+  const isUp = displayChange >= 0;
+
   return (
     <motion.div
       onClick={onClick}
@@ -25,14 +47,9 @@ function StockRow({ stock, onClick, selected }: { stock: NSEStock; onClick: () =
         <span className="text-xs text-gray-500 font-mono hidden lg:block">{stock.sector}</span>
       </div>
       <div className="flex items-center gap-8 shrink-0">
-        <span className="text-sm tabular-nums text-white w-20 text-right">{stock.price.toFixed(2)}</span>
-        <span
-          className={`text-xs font-mono font-semibold w-16 text-right ${
-            isUp ? "text-emerald-400" : "text-red-400"
-          }`}
-        >
-          {isUp ? "+" : ""}
-          {stock.changePercent.toFixed(2)}%
+        <span className="text-sm tabular-nums text-white w-20 text-right">{displayPrice.toFixed(2)}</span>
+        <span className={`text-xs font-mono font-semibold w-16 text-right ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+          {isUp ? "+" : ""}{displayChange.toFixed(2)}%
         </span>
         <span className="text-xs font-mono text-gray-500 w-20 text-right hidden md:block">
           {stock.marketCap}B
@@ -188,6 +205,7 @@ export default function NSETracker({ embedded = false, days = 30 }: { embedded?:
                       <StockRow
                         key={stock.symbol}
                         stock={stock}
+                        days={days}
                         selected={selected?.symbol === stock.symbol}
                         onClick={() =>
                           setSelected((prev) =>
