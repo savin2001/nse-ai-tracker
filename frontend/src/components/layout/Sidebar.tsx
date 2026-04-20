@@ -2,15 +2,16 @@ import { NavLink } from "react-router-dom";
 import { motion } from "motion/react";
 import {
   LayoutDashboard, BriefcaseBusiness, Bell,
-  Settings, TrendingUp, LogOut, Activity, X,
+  Settings, TrendingUp, LogOut, Activity, X, LineChart,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const LINKS = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/portfolio",  icon: BriefcaseBusiness, label: "Portfolio" },
-  { to: "/events",     icon: Bell,              label: "Events"    },
-  { to: "/settings",   icon: Settings,          label: "Settings"  },
+  { to: "/dashboard", icon: LayoutDashboard,  label: "Dashboard" },
+  { to: "/trends",    icon: LineChart,         label: "Trends"    },
+  { to: "/portfolio", icon: BriefcaseBusiness, label: "Portfolio" },
+  { to: "/events",    icon: Bell,              label: "Events"    },
+  { to: "/settings",  icon: Settings,          label: "Settings"  },
 ];
 
 interface Props {

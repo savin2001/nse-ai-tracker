@@ -42,7 +42,7 @@ function StockRow({ stock, onClick, selected }: { stock: NSEStock; onClick: () =
   );
 }
 
-export default function NSETracker({ embedded = false }: { embedded?: boolean }) {
+export default function NSETracker({ embedded = false, days = 30 }: { embedded?: boolean; days?: number }) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("All");
   const [view, setView] = useState<View>("grid");
@@ -162,6 +162,7 @@ export default function NSETracker({ embedded = false }: { embedded?: boolean })
                       key={stock.symbol}
                       stock={stock}
                       index={i}
+                      days={days}
                       selected={selected?.symbol === stock.symbol}
                       onClick={() =>
                         setSelected((prev) =>
@@ -219,6 +220,7 @@ export default function NSETracker({ embedded = false }: { embedded?: boolean })
                   <StockDetail
                     stock={selected}
                     onClose={() => setSelected(null)}
+                    days={days}
                   />
                 </div>
               )}

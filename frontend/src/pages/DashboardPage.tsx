@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { Link } from "react-router-dom";
 import {
   TrendingUp, TrendingDown, Minus, RefreshCw,
-  AlertCircle, Target, Clock, Zap,
+  AlertCircle, Target, Clock, Zap, ArrowRight,
 } from "lucide-react";
 import { api, type Signal } from "../api/client";
-import NSETracker from "./NSETracker";
+import { NSE_STOCKS, type NSEStock } from "../data/nseData";
+import StockCard from "../components/nse/StockCard";
+import StockDetail from "../components/nse/StockDetail";
 
 const SIG_CFG = {
   BUY:  { bg: "bg-emerald-500/10", border: "border-emerald-500/25", text: "text-emerald-400", pill: "bg-emerald-500/15 text-emerald-400", Icon: TrendingUp  },
@@ -75,11 +78,38 @@ function SignalCard({ sig, rank }: { sig: Signal; rank?: number }) {
 
 type Filter = "top" | SigKey;
 
+function useHoldingsStocks() {
+  const [stocks, setStocks] = useState<NSEStock[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api.portfolio.list(), api.watchlist.list()])
+      .then(([allocs, watchlist]) => {
+        if (cancelled) return;
+        const tickers = [
+          ...allocs.map(a => a.ticker),
+          ...watchlist.filter(t => !allocs.some(a => a.ticker === t)),
+        ];
+        const matched = tickers
+          .map(t => NSE_STOCKS.find(s => s.symbol === t))
+          .filter((s): s is NSEStock => s !== undefined)
+          .slice(0, 6);
+        setStocks(matched);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  return stocks;
+}
+
 export default function DashboardPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
   const [filter,  setFilter]  = useState<Filter>("top");
+  const [selected, setSelected] = useState<NSEStock | null>(null);
+  const holdingsStocks = useHoldingsStocks();
 
   async function fetchSignals() {
     setLoading(true); setError(null);
@@ -207,13 +237,59 @@ export default function DashboardPage() {
 
       <div className="border-t border-white/5" />
 
-      {/* ── Market overview ───────────────────────────────────────────────── */}
+      {/* ── My Holdings ───────────────────────────────────────────────────── */}
       <section>
-        <div className="mb-5">
-          <h2 className="text-base font-semibold text-white">Equities</h2>
-          <p className="text-xs text-gray-600 mt-0.5">Live NSE prices · click a card to view detail</p>
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <h2 className="text-base font-semibold text-white">My Holdings</h2>
+            <p className="text-xs text-gray-600 mt-0.5">Portfolio &amp; watchlist · click a card to view detail</p>
+          </div>
+          <Link
+            to="/trends"
+            className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-mono"
+          >
+            All equities <ArrowRight size={11} />
+          </Link>
         </div>
-        <NSETracker embedded />
+
+        {holdingsStocks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-white/8 rounded-2xl">
+            <p className="text-sm text-gray-500">No holdings yet</p>
+            <p className="text-xs text-gray-700 mt-1">
+              Add stocks to your{" "}
+              <Link to="/portfolio" className="text-emerald-500 hover:underline">portfolio</Link>
+              {" "}or watchlist to see them here.
+            </p>
+          </div>
+        ) : (
+          <div className={`flex flex-col md:flex-row gap-5 ${selected ? "md:items-start" : ""}`}>
+            <div className={`flex-1 min-w-0 transition-all duration-300 ${selected ? "md:max-w-[55%]" : "w-full"}`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {holdingsStocks.map((stock, i) => (
+                  <StockCard
+                    key={stock.symbol}
+                    stock={stock}
+                    index={i}
+                    days={30}
+                    selected={selected?.symbol === stock.symbol}
+                    onClick={() => setSelected(prev => prev?.symbol === stock.symbol ? null : stock)}
+                  />
+                ))}
+              </div>
+            </div>
+            <AnimatePresence>
+              {selected && (
+                <div className="w-full md:w-[42%] md:shrink-0 md:sticky md:top-[56px] md:max-h-[calc(100vh-72px)] md:overflow-y-auto no-scrollbar">
+                  <StockDetail
+                    stock={selected}
+                    onClose={() => setSelected(null)}
+                    days={90}
+                  />
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </section>
     </div>
   );

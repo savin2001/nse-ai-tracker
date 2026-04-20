@@ -11,14 +11,15 @@ interface Props {
   onClick: () => void;
   selected?: boolean;
   index: number;
+  days?: number;
 }
 
-export default function StockCard({ stock, onClick, selected, index }: Props) {
+export default function StockCard({ stock, onClick, selected, index, days = 30 }: Props) {
   const [sparkHistory, setSparkHistory] = useState<PricePoint[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    api.stocks.prices(stock.symbol, 30)
+    api.stocks.prices(stock.symbol, days)
       .then(prices => {
         if (cancelled || !prices.length) return;
         setSparkHistory([...prices].reverse() as PricePoint[]);
