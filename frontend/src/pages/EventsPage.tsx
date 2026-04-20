@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Bell, AlertCircle, RefreshCw, Filter, Newspaper, ExternalLink } from "lucide-react";
+import {
+  Bell, AlertCircle, RefreshCw, Filter,
+  Newspaper, ExternalLink, ChevronLeft, ChevronRight,
+} from "lucide-react";
 import { api, type MarketEvent, type NewsArticle } from "../api/client";
 import CompanySearch from "../components/nse/CompanySearch";
 import { NSE_STOCKS } from "../data/nseData";
+
+const PAGE_SIZE = 10;
 
 function companyName(ticker: string): string | undefined {
   return NSE_STOCKS.find(s => s.symbol === ticker)?.name;
@@ -31,11 +36,10 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 function EventCard({ event }: { event: MarketEvent }) {
-  const cfg = SEVERITY_CONFIG[event.severity] ?? SEVERITY_CONFIG.low;
+  const cfg   = SEVERITY_CONFIG[event.severity] ?? SEVERITY_CONFIG.low;
   const label = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type.replace(/_/g, " ");
-  const dt = new Date(event.detected_at);
-  const relTime = formatRelative(dt);
-  const name = companyName(event.ticker);
+  const dt    = new Date(event.detected_at);
+  const name  = companyName(event.ticker);
 
   return (
     <motion.div
@@ -61,7 +65,7 @@ function EventCard({ event }: { event: MarketEvent }) {
         </div>
       </div>
       <p className="text-sm text-gray-300 mt-2 leading-relaxed">{event.description}</p>
-      <p className="text-[10px] text-gray-600 font-mono mt-2">{relTime} · {dt.toLocaleString()}</p>
+      <p className="text-[10px] text-gray-600 font-mono mt-2">{formatRelative(dt)} · {dt.toLocaleString()}</p>
     </motion.div>
   );
 }
@@ -115,10 +119,39 @@ function NewsCard({ article }: { article: NewsArticle }) {
   );
 }
 
+function Pagination({
+  page, hasMore, loading, onPrev, onNext,
+}: {
+  page: number; hasMore: boolean; loading: boolean;
+  onPrev: () => void; onNext: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between pt-2">
+      <button
+        onClick={onPrev}
+        disabled={page === 1 || loading}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs text-gray-400
+          hover:text-white hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronLeft size={13} /> Prev
+      </button>
+      <span className="text-xs text-gray-600 font-mono tabular-nums">Page {page}</span>
+      <button
+        onClick={onNext}
+        disabled={!hasMore || loading}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs text-gray-400
+          hover:text-white hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        Next <ChevronRight size={13} />
+      </button>
+    </div>
+  );
+}
+
 function formatRelative(dt: Date): string {
   const diff = (Date.now() - dt.getTime()) / 1000;
-  if (diff < 60)   return `${Math.round(diff)}s ago`;
-  if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
+  if (diff < 60)    return `${Math.round(diff)}s ago`;
+  if (diff < 3600)  return `${Math.round(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
   return `${Math.round(diff / 86400)}d ago`;
 }
@@ -128,30 +161,54 @@ const SEVERITIES: Array<MarketEvent["severity"] | "all"> = ["all", "critical", "
 type Tab = "events" | "news";
 
 export default function EventsPage() {
-  const [events, setEvents]     = useState<MarketEvent[]>([]);
-  const [news, setNews]         = useState<NewsArticle[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [severity, setSeverity] = useState<MarketEvent["severity"] | "all">("all");
-  const [ticker, setTicker]     = useState("");
-  const [tab, setTab]           = useState<Tab>("events");
+  const [events, setEvents]         = useState<MarketEvent[]>([]);
+  const [news, setNews]             = useState<NewsArticle[]>([]);
+  const [eventCounts, setEventCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [severity, setSeverity]     = useState<MarketEvent["severity"] | "all">("all");
+  const [ticker, setTicker]         = useState("");
+  const [tab, setTab]               = useState<Tab>("events");
+  const [eventsPage, setEventsPage] = useState(1);
+  const [newsPage, setNewsPage]     = useState(1);
+  const [eventsHasMore, setEventsHasMore] = useState(false);
+  const [newsHasMore, setNewsHasMore]     = useState(false);
 
-  async function load() {
+  async function load(ePage = eventsPage, nPage = newsPage) {
     setLoading(true); setError(null);
     try {
-      const params: Record<string, string> = { limit: "50" };
-      if (severity !== "all") params.severity = severity;
-      if (ticker.trim()) params.ticker = ticker.trim().toUpperCase();
+      const eParams: Record<string, string> = {
+        limit:  String(PAGE_SIZE),
+        offset: String((ePage - 1) * PAGE_SIZE),
+      };
+      if (severity !== "all") eParams.severity = severity;
+      if (ticker.trim()) eParams.ticker = ticker.trim().toUpperCase();
 
-      const newsParams: Record<string, string> = { limit: "30", days: "7" };
-      if (ticker.trim()) newsParams.ticker = ticker.trim().toUpperCase();
+      const nParams: Record<string, string> = {
+        limit:  String(PAGE_SIZE),
+        offset: String((nPage - 1) * PAGE_SIZE),
+        days:   "30",
+      };
+      if (ticker.trim()) nParams.ticker = ticker.trim().toUpperCase();
 
       const [eventsData, newsData] = await Promise.all([
-        api.events.list(params),
-        api.news.list(newsParams).catch(() => [] as NewsArticle[]),
+        api.events.list(eParams),
+        api.news.list(nParams).catch(() => [] as NewsArticle[]),
       ]);
+
       setEvents(eventsData);
       setNews(newsData);
+      setEventsHasMore(eventsData.length === PAGE_SIZE);
+      setNewsHasMore(newsData.length === PAGE_SIZE);
+
+      // Update severity counts only when on page 1 and no severity filter
+      if (ePage === 1 && severity === "all" && !ticker) {
+        const counts = eventsData.reduce(
+          (acc, e) => { acc[e.severity] = (acc[e.severity] ?? 0) + 1; return acc; },
+          {} as Record<string, number>,
+        );
+        setEventCounts(counts);
+      }
     } catch (err: any) {
       setError(err.message ?? "Failed to load events");
     } finally {
@@ -159,12 +216,22 @@ export default function EventsPage() {
     }
   }
 
-  useEffect(() => { load(); }, [severity, ticker]);
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setEventsPage(1);
+    setNewsPage(1);
+    load(1, 1);
+  }, [severity, ticker]);
 
-  const counts = events.reduce(
-    (acc, e) => { acc[e.severity] = (acc[e.severity] ?? 0) + 1; return acc; },
-    {} as Record<string, number>,
-  );
+  // Re-fetch when page changes
+  useEffect(() => { load(eventsPage, newsPage); }, [eventsPage, newsPage]);
+
+  function handleEventsPage(dir: 1 | -1) {
+    setEventsPage(p => Math.max(1, p + dir));
+  }
+  function handleNewsPage(dir: 1 | -1) {
+    setNewsPage(p => Math.max(1, p + dir));
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
@@ -178,7 +245,7 @@ export default function EventsPage() {
           <p className="text-sm text-gray-400">Auto-detected earnings, dividends, price spikes, and news</p>
         </div>
         <button
-          onClick={load}
+          onClick={() => load()}
           disabled={loading}
           className="text-gray-500 hover:text-white transition-colors disabled:opacity-40"
         >
@@ -187,7 +254,7 @@ export default function EventsPage() {
       </div>
 
       {/* Severity summary tiles — events tab only */}
-      {tab === "events" && events.length > 0 && (
+      {tab === "events" && Object.keys(eventCounts).length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(["critical", "high", "medium", "low"] as const).map(s => {
             const cfg = SEVERITY_CONFIG[s];
@@ -201,7 +268,7 @@ export default function EventsPage() {
                     : "bg-white/[0.025] border-white/8 text-gray-500 hover:border-white/10"
                 }`}
               >
-                <div className="text-lg font-bold tabular-nums">{counts[s] ?? 0}</div>
+                <div className="text-lg font-bold tabular-nums">{eventCounts[s] ?? 0}</div>
                 <div className="text-[10px] capitalize">{s}</div>
               </button>
             );
@@ -221,8 +288,8 @@ export default function EventsPage() {
         >
           <Bell size={13} />
           Events
-          {events.length > 0 && (
-            <span className="text-[10px] font-mono bg-white/8 px-1.5 py-0.5 rounded-full">{events.length}</span>
+          {eventsPage > 1 && (
+            <span className="text-[10px] font-mono bg-white/8 px-1.5 py-0.5 rounded-full">p{eventsPage}</span>
           )}
         </button>
         <button
@@ -235,8 +302,8 @@ export default function EventsPage() {
         >
           <Newspaper size={13} />
           News
-          {news.length > 0 && (
-            <span className="text-[10px] font-mono bg-white/8 px-1.5 py-0.5 rounded-full">{news.length}</span>
+          {newsPage > 1 && (
+            <span className="text-[10px] font-mono bg-white/8 px-1.5 py-0.5 rounded-full">p{newsPage}</span>
           )}
         </button>
       </div>
@@ -261,7 +328,6 @@ export default function EventsPage() {
             ))}
           </div>
         )}
-
         <CompanySearch
           onSelect={t => setTicker(t)}
           onClear={() => setTicker("")}
@@ -281,23 +347,34 @@ export default function EventsPage() {
       {tab === "events" && (
         loading ? (
           <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: PAGE_SIZE }).map((_, i) => (
               <div key={i} className="h-24 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
             ))}
           </div>
         ) : events.length === 0 ? (
           <div className="text-center py-16 text-gray-500 text-sm">
-            {error ? "Events unavailable" : "No events detected yet — run the event detection worker to populate this feed."}
+            {eventsPage > 1
+              ? "No more events on this page."
+              : "No events detected yet — run the event detection worker to populate this feed."}
           </div>
         ) : (
-          <motion.div
-            className="space-y-3"
-            initial="hidden"
-            animate="show"
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
-          >
-            {events.map(e => <EventCard key={e.id} event={e} />)}
-          </motion.div>
+          <>
+            <motion.div
+              className="space-y-3"
+              initial="hidden"
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.03 } } }}
+            >
+              {events.map(e => <EventCard key={e.id} event={e} />)}
+            </motion.div>
+            <Pagination
+              page={eventsPage}
+              hasMore={eventsHasMore}
+              loading={loading}
+              onPrev={() => handleEventsPage(-1)}
+              onNext={() => handleEventsPage(1)}
+            />
+          </>
         )
       )}
 
@@ -305,18 +382,29 @@ export default function EventsPage() {
       {tab === "news" && (
         loading ? (
           <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: PAGE_SIZE }).map((_, i) => (
               <div key={i} className="h-20 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
             ))}
           </div>
         ) : news.length === 0 ? (
           <div className="text-center py-16 text-gray-500 text-sm">
-            No news articles found{ticker ? ` for ${ticker}` : ""} in the last 7 days.
+            {newsPage > 1
+              ? "No more articles on this page."
+              : `No news articles found${ticker ? ` for ${ticker}` : ""} in the last 30 days.`}
           </div>
         ) : (
-          <div className="space-y-2">
-            {news.map(a => <NewsCard key={a.id} article={a} />)}
-          </div>
+          <>
+            <div className="space-y-2">
+              {news.map(a => <NewsCard key={a.id} article={a} />)}
+            </div>
+            <Pagination
+              page={newsPage}
+              hasMore={newsHasMore}
+              loading={loading}
+              onPrev={() => handleNewsPage(-1)}
+              onNext={() => handleNewsPage(1)}
+            />
+          </>
         )
       )}
     </div>
