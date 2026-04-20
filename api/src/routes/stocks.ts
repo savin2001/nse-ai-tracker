@@ -9,7 +9,7 @@ const tickerParam = z.object({
 });
 
 const priceQuerySchema = z.object({
-  days: z.coerce.number().int().min(1).max(365).default(90),
+  days: z.coerce.number().int().min(1).max(600).default(90),
 });
 
 /** GET /api/stocks — list all companies */
