@@ -6,7 +6,7 @@ import {
   AlertCircle, Target, Clock, Zap, ArrowRight,
 } from "lucide-react";
 import { api, type Signal } from "../api/client";
-import { NSE_STOCKS, type NSEStock } from "../data/nseData";
+import type { NSEStock } from "../data/nseData";
 import StockCard from "../components/nse/StockCard";
 import StockDetail from "../components/nse/StockDetail";
 
@@ -89,16 +89,36 @@ function useHoldingsStocks() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.portfolio.list(), api.watchlist.list()])
-      .then(([allocs, watchlist]) => {
+    Promise.all([api.portfolio.list(), api.watchlist.list(), api.stocks.list()])
+      .then(([allocs, watchlist, companies]) => {
         if (cancelled) return;
         const tickers = [
           ...allocs.map(a => a.ticker),
           ...watchlist.filter(t => !allocs.some(a => a.ticker === t)),
         ];
-        const matched = tickers
-          .map(t => NSE_STOCKS.find(s => s.symbol === t))
-          .filter((s): s is NSEStock => s !== undefined)
+        // Build NSEStock-compatible objects from real DB data.
+        // history is empty — StockCard fetches live prices from the API.
+        const matched: NSEStock[] = tickers
+          .flatMap(t => {
+            const c = companies.find(co => co.ticker === t);
+            if (!c) return [];
+            const s: NSEStock = {
+              symbol:        c.ticker,
+              name:          c.name,
+              sector:        c.sector,
+              price:         0,
+              change:        0,
+              changePercent: 0,
+              volume:        0,
+              marketCap:     c.market_cap ? +(c.market_cap / 1e9).toFixed(2) : 0,
+              high52w:       c.high_52w ?? 0,
+              low52w:        c.low_52w  ?? 0,
+              peRatio:       null,
+              dividendYield: null,
+              history:       [],
+            };
+            return [s];
+          })
           .slice(0, 6);
         setStocks(matched);
       })
@@ -276,7 +296,7 @@ export default function DashboardPage() {
                     key={stock.symbol}
                     stock={stock}
                     index={i}
-                    days={30}
+                    days={90}
                     selected={selected?.symbol === stock.symbol}
                     onClick={() => setSelected(prev => prev?.symbol === stock.symbol ? null : stock)}
                   />

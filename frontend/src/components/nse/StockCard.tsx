@@ -26,7 +26,7 @@ export default function StockCard({ stock, onClick, selected, index, days = 30 }
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [stock.symbol]);
+  }, [stock.symbol, days]);
 
   // Derive live price + change from fetched history; fall back to static data
   const livePrice      = sparkHistory ? sparkHistory[sparkHistory.length - 1]?.close : null;
@@ -90,9 +90,9 @@ export default function StockCard({ stock, onClick, selected, index, days = 30 }
         <p className="text-[10px] text-gray-600 font-mono mb-1 truncate">{stock.sector}</p>
         <p className="text-sm font-semibold text-white leading-tight truncate mb-3">{stock.name}</p>
 
-        {/* Sparkline */}
-        <div className="h-10 mb-3 opacity-60 group-hover:opacity-95 transition-opacity duration-200">
-          <StockChart history={sparkHistory ?? stock.history} height={40} />
+        {/* Sparkline — aspect-ratio makes height scale with card width */}
+        <div className="w-full mb-3 opacity-60 group-hover:opacity-95 transition-opacity duration-200" style={{ aspectRatio: "5 / 1" }}>
+          <StockChart history={sparkHistory ?? stock.history} height={80} id={stock.symbol} />
         </div>
 
         {/* Footer */}

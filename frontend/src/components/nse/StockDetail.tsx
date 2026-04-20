@@ -144,7 +144,9 @@ export default function StockDetail({ stock, onClose, days = 90 }: Props) {
           ))}
         </div>
 
-        <StockChart history={displayHistory} height={140} showAxes />
+        <div className="w-full" style={{ height: 140 }}>
+          <StockChart history={displayHistory} height={140} showAxes id={`detail-${stock.symbol}`} />
+        </div>
       </div>
 
       {/* Key stats grid */}
