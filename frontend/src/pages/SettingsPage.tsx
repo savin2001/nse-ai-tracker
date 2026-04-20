@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Settings, Plus, X, AlertCircle, RefreshCw, Check, Cpu, TrendingUp } from "lucide-react";
+import { Settings, Plus, X, AlertCircle, RefreshCw, Check, Cpu } from "lucide-react";
 import { api, type DailyUsage } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import CompanySearch from "../components/nse/CompanySearch";
