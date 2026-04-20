@@ -71,6 +71,18 @@ export interface Allocation {
   companies?: { name: string; sector: string };
 }
 
+export interface DailyUsage {
+  day:                  string;
+  model:                string;
+  worker:               string;
+  calls:                number;
+  total_input_tokens:   number;
+  total_output_tokens:  number;
+  total_cache_reads:    number;
+  total_cost_usd:       number;
+  failures:             number;
+}
+
 export interface NewsArticle {
   id:              number;
   ticker:          string;
@@ -141,6 +153,9 @@ export const api = {
   },
   news: {
     list: (params?: Record<string, string>) => apiFetch<NewsArticle[]>(`/api/news?${new URLSearchParams(params)}`),
+  },
+  usage: {
+    daily: (days = 30) => apiFetch<DailyUsage[]>(`/api/usage?days=${days}`),
   },
   macro: {
     list: () => apiFetch<MacroIndicator[]>("/api/macro"),

@@ -10,6 +10,7 @@ import { portfolioRouter } from "./routes/portfolio";
 import { watchlistRouter } from "./routes/watchlist";
 import { eventsRouter }    from "./routes/events";
 import { newsRouter }      from "./routes/news";
+import { usageRouter }     from "./routes/usage";
 import { macroRouter }     from "./routes/macro";
 import { notifyRouter }    from "./routes/notify";
 import { authMiddleware }  from "./middleware/auth";
@@ -139,6 +140,7 @@ app.use("/api/portfolio", authMiddleware, portfolioRouter);
 app.use("/api/watchlist", authMiddleware, watchlistRouter);
 app.use("/api/events",    authMiddleware, eventsRouter);
 app.use("/api/news",      authMiddleware, newsRouter);
+app.use("/api/usage",     authMiddleware, usageRouter);
 app.use("/api/macro",     authMiddleware, macroRouter);
 app.use("/api/notify",    notifyRouter);   // NOTIFY_SECRET-protected
 
