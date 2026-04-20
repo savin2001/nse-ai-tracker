@@ -11,9 +11,9 @@ import StockCard from "../components/nse/StockCard";
 import StockDetail from "../components/nse/StockDetail";
 
 const SIG_CFG = {
-  BUY:  { bg: "bg-emerald-500/10", border: "border-emerald-500/25", text: "text-emerald-400", pill: "bg-emerald-500/15 text-emerald-400", Icon: TrendingUp  },
-  HOLD: { bg: "bg-amber-500/10",   border: "border-amber-500/25",   text: "text-amber-400",   pill: "bg-amber-500/15 text-amber-400",   Icon: Minus       },
-  SELL: { bg: "bg-red-500/10",     border: "border-red-500/25",     text: "text-red-400",     pill: "bg-red-500/15 text-red-400",     Icon: TrendingDown},
+  BUY:  { bg: "bg-emerald-500/[0.13]", border: "border-emerald-500/40", text: "text-emerald-400", pill: "bg-emerald-500/20 text-emerald-300", glow: "rgba(16,185,129,0.18)",  Icon: TrendingUp  },
+  HOLD: { bg: "bg-amber-500/[0.11]",   border: "border-amber-500/35",   text: "text-amber-400",   pill: "bg-amber-500/20 text-amber-300",   glow: "rgba(245,158,11,0.15)",  Icon: Minus       },
+  SELL: { bg: "bg-red-500/[0.13]",     border: "border-red-500/40",     text: "text-red-400",     pill: "bg-red-500/20 text-red-300",     glow: "rgba(239,68,68,0.18)",   Icon: TrendingDown},
 } as const;
 type SigKey = keyof typeof SIG_CFG;
 
@@ -28,6 +28,7 @@ function SignalCard({ sig, rank }: { sig: Signal; rank?: number }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className={`relative flex flex-col gap-3 p-4 rounded-xl border ${c.bg} ${c.border} transition-all`}
+      style={{ boxShadow: `0 0 20px ${c.glow}` }}
     >
       {rank !== undefined && (
         <span className="absolute top-3 right-3 text-[10px] font-mono text-gray-600">#{rank + 1}</span>
@@ -35,7 +36,12 @@ function SignalCard({ sig, rank }: { sig: Signal; rank?: number }) {
 
       {/* Ticker + signal */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-bold font-mono text-white">{sig.ticker}</span>
+        <div>
+          <span className="text-sm font-bold font-mono text-white">{sig.ticker}</span>
+          {sig.companies?.name && (
+            <p className="text-[10px] text-gray-500 leading-none mt-0.5 truncate max-w-[120px]">{sig.companies.name}</p>
+          )}
+        </div>
         <span className={`flex items-center gap-1 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ${c.pill}`}>
           <c.Icon size={9} />{sig.signal}
         </span>
