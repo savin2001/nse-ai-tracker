@@ -2,12 +2,13 @@ import { useMemo } from "react";
 import type { PricePoint } from "../../data/nseData";
 
 interface Props {
-  history: PricePoint[];
-  height?: number;
+  history:   PricePoint[];
+  height?:   number;
   showAxes?: boolean;
+  id?:       string;  // stable caller-supplied ID to avoid gradient collision
 }
 
-export default function StockChart({ history, height = 120, showAxes = false }: Props) {
+export default function StockChart({ history, height = 120, showAxes = false, id = "chart" }: Props) {
   const { min, max, svgPoints, areaPoints } = useMemo(() => {
     if (history.length === 0) return { min: 0, max: 0, svgPoints: "", areaPoints: "" };
 
@@ -34,15 +35,14 @@ export default function StockChart({ history, height = 120, showAxes = false }: 
     return { min: minVal, max: maxVal, svgPoints: line, areaPoints: area };
   }, [history, height, showAxes]);
 
-  const isUp = history.length >= 2 && history[history.length - 1].close >= history[0].close;
-  const color = isUp ? "#34d399" : "#f87171";
-  const gradId = `grad-${Math.random().toString(36).slice(2, 7)}`;
+  const isUp   = history.length >= 2 && history[history.length - 1].close >= history[0].close;
+  const color  = isUp ? "#34d399" : "#f87171";
+  const gradId = `grad-${id}`;
 
   return (
     <svg
       viewBox={`0 0 600 ${height}`}
-      className="w-full"
-      style={{ height }}
+      className="w-full h-full"
       preserveAspectRatio="none"
     >
       <defs>
