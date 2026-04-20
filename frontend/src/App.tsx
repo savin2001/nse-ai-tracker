@@ -5,6 +5,7 @@ import AppLayout from "./components/layout/AppLayout";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
+import TrendsPage from "./pages/TrendsPage";
 import PortfolioPage from "./pages/PortfolioPage";
 import EventsPage from "./pages/EventsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -40,6 +41,7 @@ function AppRoutes() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/trends"    element={<TrendsPage />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
         <Route path="/events"    element={<EventsPage />} />
         <Route path="/settings"  element={<SettingsPage />} />

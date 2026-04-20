@@ -10,11 +10,16 @@ import { api } from "../../api/client";
 interface Props {
   stock: NSEStock;
   onClose: () => void;
+  days?: number;
 }
 
-type Range = "1M" | "2M" | "3M";
+type Range = "1M" | "2M" | "3M" | "6M" | "9M" | "12M";
 
-const RANGE_DAYS: Record<Range, number> = { "1M": 22, "2M": 44, "3M": 66 };
+const RANGE_DAYS: Record<Range, number> = {
+  "1M": 22, "2M": 44, "3M": 66, "6M": 130, "9M": 195, "12M": 252,
+};
+const SHORT_RANGES: Range[] = ["1M", "2M", "3M"];
+const LONG_RANGES:  Range[] = ["3M", "6M", "9M", "12M"];
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -25,8 +30,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function StockDetail({ stock, onClose }: Props) {
-  const [range, setRange] = useState<Range>("3M");
+export default function StockDetail({ stock, onClose, days = 90 }: Props) {
+  const extended = days >= 300;
+  const ranges   = extended ? LONG_RANGES : SHORT_RANGES;
+  const [range, setRange] = useState<Range>(extended ? "12M" : "3M");
   const [liveHistory, setLiveHistory] = useState<PricePoint[] | null>(null);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const isUp = stock.changePercent >= 0;
@@ -35,7 +42,8 @@ export default function StockDetail({ stock, onClose }: Props) {
     let cancelled = false;
     setLiveHistory(null);
     setLivePrice(null);
-    api.stocks.prices(stock.symbol, 90)
+    setRange(extended ? "12M" : "3M");
+    api.stocks.prices(stock.symbol, days)
       .then(prices => {
         if (cancelled || !prices.length) return;
         // API returns newest-first; reverse to ascending for the chart
@@ -121,7 +129,7 @@ export default function StockDetail({ stock, onClose }: Props) {
 
         {/* Range selector */}
         <div className="flex gap-2 mb-3">
-          {(["1M", "2M", "3M"] as Range[]).map((r) => (
+          {ranges.map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
