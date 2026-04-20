@@ -3,6 +3,11 @@ import { motion } from "motion/react";
 import { Bell, AlertCircle, RefreshCw, Filter, Newspaper, ExternalLink } from "lucide-react";
 import { api, type MarketEvent, type NewsArticle } from "../api/client";
 import CompanySearch from "../components/nse/CompanySearch";
+import { NSE_STOCKS } from "../data/nseData";
+
+function companyName(ticker: string): string | undefined {
+  return NSE_STOCKS.find(s => s.symbol === ticker)?.name;
+}
 
 const SEVERITY_CONFIG = {
   critical: { bg: "bg-red-500/10",    border: "border-red-500/30",    text: "text-red-400",    dot: "bg-red-500"    },
@@ -30,6 +35,7 @@ function EventCard({ event }: { event: MarketEvent }) {
   const label = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type.replace(/_/g, " ");
   const dt = new Date(event.detected_at);
   const relTime = formatRelative(dt);
+  const name = companyName(event.ticker);
 
   return (
     <motion.div
@@ -40,7 +46,10 @@ function EventCard({ event }: { event: MarketEvent }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 shrink-0">
           <span className={`w-2 h-2 rounded-full ${cfg.dot} mt-0.5`} />
-          <span className={`text-xs font-semibold font-mono ${cfg.text}`}>{event.ticker}</span>
+          <div>
+            <span className={`text-xs font-semibold font-mono ${cfg.text}`}>{event.ticker}</span>
+            {name && <p className="text-[10px] text-gray-500 leading-none mt-0.5">{name}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${cfg.bg} ${cfg.text} border ${cfg.border}`}>
@@ -71,8 +80,9 @@ function sentimentKey(score: number | null): string {
 }
 
 function NewsCard({ article }: { article: NewsArticle }) {
-  const snt = SENTIMENT_LABEL[sentimentKey(article.sentiment_score)];
-  const dt  = new Date(article.published_at);
+  const snt  = SENTIMENT_LABEL[sentimentKey(article.sentiment_score)];
+  const dt   = new Date(article.published_at);
+  const name = companyName(article.ticker);
   return (
     <div className="flex items-start gap-3 p-3 rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/14 transition-colors group">
       <Newspaper size={13} className="text-gray-500 shrink-0 mt-0.5" />
@@ -81,7 +91,10 @@ function NewsCard({ article }: { article: NewsArticle }) {
           {article.title}
         </p>
         <div className="flex items-center gap-3 mt-1.5">
-          <span className="text-[10px] font-mono font-bold text-emerald-400">{article.ticker}</span>
+          <div className="shrink-0">
+            <span className="text-[10px] font-mono font-bold text-emerald-400">{article.ticker}</span>
+            {name && <span className="text-[10px] text-gray-500 ml-1.5">{name}</span>}
+          </div>
           {article.source && (
             <span className="text-[10px] text-gray-600 truncate">{article.source}</span>
           )}
@@ -112,6 +125,8 @@ function formatRelative(dt: Date): string {
 
 const SEVERITIES: Array<MarketEvent["severity"] | "all"> = ["all", "critical", "high", "medium", "low"];
 
+type Tab = "events" | "news";
+
 export default function EventsPage() {
   const [events, setEvents]     = useState<MarketEvent[]>([]);
   const [news, setNews]         = useState<NewsArticle[]>([]);
@@ -119,6 +134,7 @@ export default function EventsPage() {
   const [error, setError]       = useState<string | null>(null);
   const [severity, setSeverity] = useState<MarketEvent["severity"] | "all">("all");
   const [ticker, setTicker]     = useState("");
+  const [tab, setTab]           = useState<Tab>("events");
 
   async function load() {
     setLoading(true); setError(null);
@@ -127,7 +143,7 @@ export default function EventsPage() {
       if (severity !== "all") params.severity = severity;
       if (ticker.trim()) params.ticker = ticker.trim().toUpperCase();
 
-      const newsParams: Record<string, string> = { limit: "20", days: "7" };
+      const newsParams: Record<string, string> = { limit: "30", days: "7" };
       if (ticker.trim()) newsParams.ticker = ticker.trim().toUpperCase();
 
       const [eventsData, newsData] = await Promise.all([
@@ -159,7 +175,7 @@ export default function EventsPage() {
             <Bell className="w-5 h-5 text-emerald-400" />
             <h1 className="text-lg font-semibold text-white">Market Events</h1>
           </div>
-          <p className="text-sm text-gray-400">Auto-detected earnings, dividends, price spikes, and more</p>
+          <p className="text-sm text-gray-400">Auto-detected earnings, dividends, price spikes, and news</p>
         </div>
         <button
           onClick={load}
@@ -170,8 +186,8 @@ export default function EventsPage() {
         </button>
       </div>
 
-      {/* Severity summary */}
-      {events.length > 0 && (
+      {/* Severity summary tiles — events tab only */}
+      {tab === "events" && events.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(["critical", "high", "medium", "low"] as const).map(s => {
             const cfg = SEVERITY_CONFIG[s];
@@ -193,24 +209,58 @@ export default function EventsPage() {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-white/8">
+        <button
+          onClick={() => setTab("events")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            tab === "events"
+              ? "border-emerald-400 text-white"
+              : "border-transparent text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          <Bell size={13} />
+          Events
+          {events.length > 0 && (
+            <span className="text-[10px] font-mono bg-white/8 px-1.5 py-0.5 rounded-full">{events.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab("news")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            tab === "news"
+              ? "border-emerald-400 text-white"
+              : "border-transparent text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          <Newspaper size={13} />
+          News
+          {news.length > 0 && (
+            <span className="text-[10px] font-mono bg-white/8 px-1.5 py-0.5 rounded-full">{news.length}</span>
+          )}
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 bg-white/[0.025] border border-white/8 rounded-lg px-1 py-1 w-full sm:w-auto">
-          <Filter className="w-3 h-3 text-gray-500 ml-1.5" />
-          {SEVERITIES.map(s => (
-            <button
-              key={s}
-              onClick={() => setSeverity(s)}
-              className={`text-xs px-2.5 py-1 rounded-md transition-colors capitalize ${
-                severity === s
-                  ? "bg-white/10 text-white font-medium"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        {tab === "events" && (
+          <div className="flex flex-wrap items-center gap-1.5 bg-white/[0.025] border border-white/8 rounded-lg px-1 py-1 w-full sm:w-auto">
+            <Filter className="w-3 h-3 text-gray-500 ml-1.5" />
+            {SEVERITIES.map(s => (
+              <button
+                key={s}
+                onClick={() => setSeverity(s)}
+                className={`text-xs px-2.5 py-1 rounded-md transition-colors capitalize ${
+                  severity === s
+                    ? "bg-white/10 text-white font-medium"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
 
         <CompanySearch
           onSelect={t => setTicker(t)}
@@ -227,41 +277,47 @@ export default function EventsPage() {
         </div>
       )}
 
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
-          ))}
-        </div>
-      ) : events.length === 0 ? (
-        <div className="text-center py-16 text-gray-500 text-sm">
-          {error ? "Events unavailable" : "No events detected yet — run the event detection worker to populate this feed."}
-        </div>
-      ) : (
-        <motion.div
-          className="space-y-3"
-          initial="hidden"
-          animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
-        >
-          {events.map(e => <EventCard key={e.id} event={e} />)}
-        </motion.div>
+      {/* ── Events tab ─────────────────────────────────────────────────────── */}
+      {tab === "events" && (
+        loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
+            ))}
+          </div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-16 text-gray-500 text-sm">
+            {error ? "Events unavailable" : "No events detected yet — run the event detection worker to populate this feed."}
+          </div>
+        ) : (
+          <motion.div
+            className="space-y-3"
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+          >
+            {events.map(e => <EventCard key={e.id} event={e} />)}
+          </motion.div>
+        )
       )}
 
-      {/* ── News feed ─────────────────────────────────────────────────────── */}
-      {!loading && news.length > 0 && (
-        <section className="pt-4 border-t border-white/5">
-          <div className="flex items-center gap-2 mb-3">
-            <Newspaper size={14} className="text-emerald-400" />
-            <h2 className="text-sm font-semibold text-white">
-              {ticker ? `${ticker} News` : "Market News"} · last 7 days
-            </h2>
-            <span className="text-[10px] text-gray-600 font-mono ml-auto">{news.length} articles</span>
+      {/* ── News tab ───────────────────────────────────────────────────────── */}
+      {tab === "news" && (
+        loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-20 rounded-xl bg-white/[0.025] border border-white/8 animate-pulse" />
+            ))}
           </div>
+        ) : news.length === 0 ? (
+          <div className="text-center py-16 text-gray-500 text-sm">
+            No news articles found{ticker ? ` for ${ticker}` : ""} in the last 7 days.
+          </div>
+        ) : (
           <div className="space-y-2">
             {news.map(a => <NewsCard key={a.id} article={a} />)}
           </div>
-        </section>
+        )
       )}
     </div>
   );
