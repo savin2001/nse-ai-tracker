@@ -30,6 +30,7 @@ on:
     - cron: "0 12 * * 1-5"   # price_collector  — afternoon run
     - cron: "30 5,7,9,11,13 * * 1-5"  # news_fetcher + event_detector — every 2 h
     - cron: "0 15 * * 1-5"   # ai_worker        — post-close analysis
+    - cron: "30 15 * * 1-5"  # email_worker     — digest after AI analysis
 
 # ── Job ───────────────────────────────────────────────────────────────────────
 jobs:
@@ -123,6 +124,8 @@ jobs:
       # ── email_worker ─────────────────────────────────────────────────────────
       - name: Run email_worker
         if: |
+          github.event_name == 'schedule' &&
+            github.event.schedule == '30 15 * * 1-5' ||
           github.event.inputs.worker == 'email_worker' ||
           github.event.inputs.worker == 'all'
         env:

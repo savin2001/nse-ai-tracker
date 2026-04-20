@@ -70,62 +70,76 @@ def _base_layout(title: str, body: str) -> str:
 </body></html>"""
 
 
-def build_digest_html(signals: list[dict], date_str: str) -> str:
-    buys  = sum(1 for s in signals if s["signal"] == "BUY")
-    holds = sum(1 for s in signals if s["signal"] == "HOLD")
-    sells = sum(1 for s in signals if s["signal"] == "SELL")
+def _sentiment_label(score: float | None) -> tuple[str, str]:
+    if score is None: return "—",          "#6b7280"
+    if score >  0.1:  return "▲ Positive", "#10b981"
+    if score < -0.1:  return "▼ Negative", "#ef4444"
+    return "● Neutral", "#6b7280"
 
-    rows = ""
-    for s in sorted(signals, key=lambda x: -x["confidence"])[:15]:
-        color  = SIGNAL_COLORS.get(s["signal"], "#6b7280")
-        badge  = _badge(s["signal"], color)
-        summary = (s.get("summary") or "")[:90]
-        rows += (
-            f'<tr style="border-bottom:1px solid #27272a;">'
-            f'<td style="padding:10px 8px;font-family:monospace;font-weight:700;color:#e4e4e7;">{s["ticker"]}</td>'
-            f'<td style="padding:10px 8px;">{badge}</td>'
-            f'<td style="padding:10px 8px;font-family:monospace;color:#a1a1aa;">{s["confidence"]}%</td>'
-            f'<td style="padding:10px 8px;color:#a1a1aa;font-size:12px;">{summary}…</td>'
-            f'</tr>'
-        )
 
-    body = f"""
-<h1 style="color:#f4f4f5;font-size:20px;margin:0 0 4px;">Daily Signal Digest</h1>
-<p style="color:#71717a;font-size:13px;margin:0 0 24px;">{date_str}</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-  <tr>
-    <td align="center" style="background:#052e16;border:1px solid #14532d;border-radius:8px;padding:16px;">
-      <div style="font-size:28px;font-weight:700;color:#10b981;">{buys}</div>
-      <div style="font-size:11px;color:#6ee7b7;">BUY</div>
-    </td>
-    <td width="12"></td>
-    <td align="center" style="background:#1c1917;border:1px solid #292524;border-radius:8px;padding:16px;">
-      <div style="font-size:28px;font-weight:700;color:#f59e0b;">{holds}</div>
-      <div style="font-size:11px;color:#fcd34d;">HOLD</div>
-    </td>
-    <td width="12"></td>
-    <td align="center" style="background:#450a0a;border:1px solid #7f1d1d;border-radius:8px;padding:16px;">
-      <div style="font-size:28px;font-weight:700;color:#ef4444;">{sells}</div>
-      <div style="font-size:11px;color:#fca5a5;">SELL</div>
+def build_digest_html(top5: list[dict], news_by_ticker: dict[str, list[dict]], date_str: str) -> str:
+    blocks = ""
+    for s in top5:
+        color   = SIGNAL_COLORS.get(s["signal"], "#6b7280")
+        badge   = _badge(s["signal"], color)
+        summary = s.get("summary") or "—"
+        ticker  = s["ticker"]
+
+        news_rows = ""
+        for n in news_by_ticker.get(ticker, [])[:3]:
+            snt_label, snt_color = _sentiment_label(n.get("sentiment_score"))
+            source = n.get("source") or ""
+            news_rows += (
+                f'<tr style="border-bottom:1px solid #27272a;">'
+                f'<td style="padding:8px 12px;">'
+                f'  <a href="{n["url"]}" style="color:#d4d4d8;text-decoration:none;font-size:12px;line-height:1.5;">'
+                f'    {n["title"][:110]}'
+                f'  </a>'
+                f'  <span style="display:block;color:{snt_color};font-size:10px;margin-top:3px;">'
+                f'    {snt_label}{(" · " + source) if source else ""}'
+                f'  </span>'
+                f'</td>'
+                f'</tr>'
+            )
+
+        news_section = ""
+        if news_rows:
+            news_section = f"""
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="border:1px solid #27272a;border-radius:6px;border-collapse:collapse;margin-top:12px;">
+  <tr style="background:#09090b;">
+    <td style="padding:6px 12px;font-size:10px;color:#52525b;text-transform:uppercase;letter-spacing:0.05em;">
+      Related News
     </td>
   </tr>
-</table>
+  {news_rows}
+</table>"""
+
+        blocks += f"""
 <table width="100%" cellpadding="0" cellspacing="0"
-       style="border:1px solid #27272a;border-radius:8px;border-collapse:collapse;overflow:hidden;">
-  <thead>
-    <tr style="background:#09090b;">
-      <th style="padding:10px 8px;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;">Ticker</th>
-      <th style="padding:10px 8px;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;">Signal</th>
-      <th style="padding:10px 8px;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;">Conf.</th>
-      <th style="padding:10px 8px;text-align:left;font-size:11px;color:#71717a;text-transform:uppercase;">Summary</th>
-    </tr>
-  </thead>
-  <tbody>{rows}</tbody>
-</table>
+       style="border:1px solid #27272a;border-radius:10px;border-collapse:collapse;margin-bottom:16px;">
+  <tr style="background:#09090b;">
+    <td style="padding:14px 16px;border-bottom:1px solid #27272a;">
+      <span style="color:#10b981;font-family:monospace;font-weight:700;font-size:16px;">{ticker}</span>
+      &nbsp;&nbsp;{badge}
+      <span style="float:right;color:#a1a1aa;font-family:monospace;font-size:13px;">{s["confidence"]}% confidence</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:14px 16px;color:#d4d4d8;font-size:13px;line-height:1.6;">
+      {summary}{news_section}
+    </td>
+  </tr>
+</table>"""
+
+    body = f"""
+<h1 style="color:#f4f4f5;font-size:20px;margin:0 0 4px;">Top 5 Movers — Daily Digest</h1>
+<p style="color:#71717a;font-size:13px;margin:0 0 24px;">{date_str} · Ranked by AI confidence</p>
+{blocks}
 <p style="margin:24px 0 0;color:#52525b;font-size:12px;">
-  Signals generated by Claude AI (claude-sonnet-4-6)
+  Signals generated by Claude AI (claude-sonnet-4-6) · Not financial advice
 </p>"""
-    return _base_layout(f"NSE AI Daily Digest — {date_str}", body)
+    return _base_layout(f"NSE AI Top 5 — {date_str}", body)
 
 
 def build_event_alert_html(event: dict) -> str:
@@ -189,29 +203,49 @@ def send_email(to: str, subject: str, html: str) -> None:
 # ── Worker entrypoints ────────────────────────────────────────────────────────
 
 def send_daily_digest() -> None:
-    """Fetch the latest signal per ticker and email the digest."""
+    """Email the top 5 highest-confidence signals with corroborating news."""
     db     = get_db()
     schema = nse(db)
 
-    signals = (
+    all_signals = (
         schema.table("latest_signals")
         .select("ticker, signal, confidence, summary")
         .order("confidence", desc=True)
+        .limit(5)
         .execute()
         .data
     )
 
-    if not signals:
+    if not all_signals:
         log.warning("no_signals_today", date=str(date.today()))
         return
 
+    # Fetch recent news for each of the top-5 tickers
+    top5 = all_signals[:5]
+    tickers = [s["ticker"] for s in top5]
+    since = (datetime.now(tz=timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    news_rows = (
+        schema.table("news_articles")
+        .select("ticker, title, url, published_at, sentiment_score, source")
+        .in_("ticker", tickers)
+        .gte("published_at", since)
+        .order("published_at", desc=True)
+        .limit(15)
+        .execute()
+        .data or []
+    )
+
+    news_by_ticker: dict[str, list[dict]] = {}
+    for n in news_rows:
+        news_by_ticker.setdefault(n["ticker"], []).append(n)
+
     date_str = datetime.now(tz=timezone.utc).strftime("%A, %d %B %Y")
-    html     = build_digest_html(signals, date_str)
-    buys     = sum(1 for s in signals if s["signal"] == "BUY")
-    sells    = sum(1 for s in signals if s["signal"] == "SELL")
+    html     = build_digest_html(top5, news_by_ticker, date_str)
+    top1     = top5[0]
     subject  = (
-        f"NSE AI Daily Digest — {date_str} "
-        f"({buys} BUY / {sells} SELL / {len(signals)-buys-sells} HOLD)"
+        f"NSE AI Top 5 — {date_str} | "
+        f"#{1} {top1['ticker']} {top1['signal']} {top1['confidence']}%"
     )
     send_email(ALERT_EMAIL, subject, html)
 

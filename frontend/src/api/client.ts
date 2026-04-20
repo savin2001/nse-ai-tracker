@@ -71,6 +71,16 @@ export interface Allocation {
   companies?: { name: string; sector: string };
 }
 
+export interface NewsArticle {
+  id:              number;
+  ticker:          string;
+  title:           string;
+  url:             string;
+  published_at:    string;
+  sentiment_score: number | null;
+  source:          string | null;
+}
+
 export interface MacroIndicator {
   indicator:   string;
   value:       number;
@@ -128,6 +138,9 @@ export const api = {
   },
   events: {
     list: (params?: Record<string, string>) => apiFetch<MarketEvent[]>(`/api/events?${new URLSearchParams(params)}`),
+  },
+  news: {
+    list: (params?: Record<string, string>) => apiFetch<NewsArticle[]>(`/api/news?${new URLSearchParams(params)}`),
   },
   macro: {
     list: () => apiFetch<MacroIndicator[]>("/api/macro"),
