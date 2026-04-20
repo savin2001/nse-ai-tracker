@@ -19,18 +19,23 @@ on:
           - ai_worker
           - email_worker
 
-  # Scheduled runs (all times UTC — NSE is UTC+3 / EAT)
+  # Scheduled runs — all within the NSE active window
   #
-  # Intraday (06:00 & 12:00):  price_collector only
-  # Intraday (every 2 h):      news_fetcher + event_detector
-  # Post-close chain (15:00):  price_collector → news_fetcher → event_detector
-  #                             → ai_worker → email_worker  (all in one job,
-  #                             in order, so email always has the freshest data)
+  # NSE market hours : 09:00–15:00 EAT (06:00–12:00 UTC)
+  # Active window    : 08:00–16:00 EAT (05:00–13:00 UTC)  ← 1 h buffer each side
+  #
+  # 05:00 UTC = 08:00 EAT  pre-market price snapshot   (1 h before open)
+  # 06:00 UTC = 09:00 EAT  price at market open
+  # 12:00 UTC = 15:00 EAT  price at market close
+  # 05:30–11:30 UTC        news + events every 2 h     (08:30–14:30 EAT)
+  # 13:00 UTC = 16:00 EAT  post-close chain            (1 h after close)
+  #                         price → news → events → ai_worker → email
   schedule:
-    - cron: "0 6  * * 1-5"              # price_collector — morning run
-    - cron: "0 12 * * 1-5"             # price_collector — midday run
-    - cron: "30 5,7,9,11,13 * * 1-5"  # news + events   — intraday every 2 h
-    - cron: "0 15 * * 1-5"             # post-close chain (see above)
+    - cron: "0 5  * * 1-5"            # price_collector — pre-market 08:00 EAT
+    - cron: "0 6  * * 1-5"            # price_collector — market open 09:00 EAT
+    - cron: "0 12 * * 1-5"            # price_collector — market close 15:00 EAT
+    - cron: "30 5,7,9,11 * * 1-5"    # news + events   — every 2 h 08:30–14:30 EAT
+    - cron: "0 13 * * 1-5"            # post-close chain — 16:00 EAT (end of window)
 
 # ── Job ───────────────────────────────────────────────────────────────────────
 jobs:
@@ -60,9 +65,10 @@ jobs:
       - name: Run price_collector
         if: |
           github.event_name == 'schedule' && (
+            github.event.schedule == '0 5 * * 1-5'  ||
             github.event.schedule == '0 6 * * 1-5'  ||
             github.event.schedule == '0 12 * * 1-5' ||
-            github.event.schedule == '0 15 * * 1-5'
+            github.event.schedule == '0 13 * * 1-5'
           ) ||
           github.event.inputs.worker == 'price_collector' ||
           github.event.inputs.worker == 'all'
@@ -88,8 +94,8 @@ jobs:
       - name: Run news_fetcher
         if: |
           github.event_name == 'schedule' && (
-            github.event.schedule == '30 5,7,9,11,13 * * 1-5' ||
-            github.event.schedule == '0 15 * * 1-5'
+            github.event.schedule == '30 5,7,9,11 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5'
           ) ||
           github.event.inputs.worker == 'news_fetcher' ||
           github.event.inputs.worker == 'all'
@@ -103,8 +109,8 @@ jobs:
       - name: Run event_detector
         if: |
           github.event_name == 'schedule' && (
-            github.event.schedule == '30 5,7,9,11,13 * * 1-5' ||
-            github.event.schedule == '0 15 * * 1-5'
+            github.event.schedule == '30 5,7,9,11 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5'
           ) ||
           github.event.inputs.worker == 'event_detector' ||
           github.event.inputs.worker == 'all'
@@ -121,7 +127,7 @@ jobs:
       - name: Run ai_worker
         if: |
           github.event_name == 'schedule' &&
-            github.event.schedule == '0 15 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5' ||
           github.event.inputs.worker == 'ai_worker' ||
           github.event.inputs.worker == 'all'
         env:
@@ -136,7 +142,7 @@ jobs:
       - name: Run email_worker
         if: |
           github.event_name == 'schedule' &&
-            github.event.schedule == '0 15 * * 1-5' ||
+            github.event.schedule == '0 13 * * 1-5' ||
           github.event.inputs.worker == 'email_worker' ||
           github.event.inputs.worker == 'all'
         env:
