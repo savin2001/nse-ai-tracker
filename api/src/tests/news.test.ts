@@ -46,4 +46,9 @@ describe("GET /news", () => {
     const res = await request(app).get("/?ticker=X");
     expect(res.status).toBe(400);
   });
+
+  it("accepts offset param", async () => {
+    const res = await request(app).get("/?offset=10");
+    expect(res.status).toBe(200);
+  });
 });
