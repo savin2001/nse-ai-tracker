@@ -59,6 +59,10 @@ app.use(helmet({
     preload:           true,
   },
 }));
+app.use((_req, res, next) => {
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  next();
+});
 
 // ── CORS — locked to configured origins ───────────────────────────────────────
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
