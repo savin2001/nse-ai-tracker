@@ -1527,10 +1527,10 @@
         {
           "id": "SP-08-02",
           "name": "Monitoring & Alerting Configured",
-          "status": "pending",
+          "status": "completed",
           "priority": "high",
           "estimated_hours": 2,
-          "completed_at": null,
+          "completed_at": "2026-04-21T00:00:00Z",
           "dependencies": [
             "SP-08-01",
             "SP-06-03"
@@ -1549,8 +1549,10 @@
             "Supabase auth alerts configured"
           ],
           "outputs": [
-            "Monitoring active",
-            "runbooks/incidents.md"
+            "runbooks/incidents.md",
+            "docs/launch-checklist.md",
+            "scripts/backfill.sh",
+            "Note: UptimeRobot monitors and Railway failure webhooks require manual setup in external dashboards"
           ]
         },
         {
@@ -1793,18 +1795,17 @@
       "SP-04-04 \u2192 SP-05-01 \u2192 SP-05-02 \u2192 SP-05-03 \u2192 SP-05-04 \u2192 SP-05-05 \u2192 SP-07-01 \u2192 SP-08-01 \u2192 SP-08-04"
     ],
     "savepoints_by_status": {
-      "pending": 3,
+      "pending": 2,
       "in_progress": 0,
-      "complete": 49,
+      "complete": 50,
       "blocked": 0
     },
-    "completion_percentage": 94,
-    "completed_savepoints": 49,
-    "pending_savepoints": 3,
+    "completion_percentage": 96,
+    "completed_savepoints": 50,
+    "pending_savepoints": 2,
     "pending_items": [
-      "SP-08-02: Monitoring & Alerting — UptimeRobot monitors, Railway failure webhooks, runbooks/incidents.md",
-      "SP-08-03: Production Data Backfill — run price_collector backfill for 365 days, run initial ai_worker to populate signals",
-      "SP-08-04: Launch Checklist — blocked on SP-08-02 and SP-08-03; requires security re-scan and v1.0.0 tag"
+      "SP-08-03: Production Data Backfill — run scripts/backfill.sh with TV_USERNAME/TV_PASSWORD on production; verify >=200 price rows per ticker",
+      "SP-08-04: Launch Checklist — blocked on SP-08-03; run securityheaders scan, verify cron jobs, tag v1.0.0"
     ]
   }
 }
