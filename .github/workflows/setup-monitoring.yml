@@ -1,0 +1,122 @@
+name: Setup Monitoring
+
+# Run once manually to create UptimeRobot monitors via API.
+# Re-running is safe — UptimeRobot will return an error for duplicate URLs
+# which this workflow treats as a warning, not a failure.
+#
+# Required secrets:
+#   UPTIMEROBOT_API_KEY  — Main API key from UptimeRobot → My Settings → API Settings
+#   API_BASE_URL         — e.g. https://nse-ai-tracker.up.railway.app
+#   FRONTEND_URL         — e.g. https://nse-ai-tracker.netlify.app
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action"
+        required: true
+        default: create
+        type: choice
+        options:
+          - create     # Create monitors (idempotent — skips if URL already monitored)
+          - list       # List existing monitors (read-only)
+
+jobs:
+  uptimerobot:
+    name: Configure UptimeRobot monitors
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate secrets
+        run: |
+          missing=""
+          [ -z "${{ secrets.UPTIMEROBOT_API_KEY }}" ] && missing="$missing UPTIMEROBOT_API_KEY"
+          [ -z "${{ secrets.API_BASE_URL }}"         ] && missing="$missing API_BASE_URL"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secrets:$missing"
+            echo "Add them under Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "Secrets present."
+
+      # ── List monitors (read-only) ────────────────────────────────────────────
+      - name: List existing monitors
+        if: github.event.inputs.action == 'list'
+        run: |
+          echo "Fetching monitor list..."
+          curl -s -X POST "https://api.uptimerobot.com/v2/getMonitors" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "api_key=${{ secrets.UPTIMEROBOT_API_KEY }}&format=json&logs=0" \
+            | python3 -m json.tool
+
+      # ── Create monitors ──────────────────────────────────────────────────────
+      - name: Create monitor — API /health
+        if: github.event.inputs.action == 'create'
+        run: |
+          API_URL="${{ secrets.API_BASE_URL }}/health"
+          echo "Creating monitor for $API_URL ..."
+
+          RESPONSE=$(curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "api_key=${{ secrets.UPTIMEROBOT_API_KEY }}" \
+            --data-urlencode "friendly_name=NSE AI - API Health" \
+            --data-urlencode "url=$API_URL" \
+            -d "type=1&interval=300&http_method=1")
+
+          echo "$RESPONSE" | python3 -m json.tool
+
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stat',''))" 2>/dev/null)
+          if [ "$STATUS" != "ok" ]; then
+            ERROR=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error',{}).get('message','unknown'))" 2>/dev/null)
+            if echo "$ERROR" | grep -qi "already"; then
+              echo "::warning::Monitor for API /health already exists — skipping"
+            else
+              echo "::error::Failed to create API monitor: $ERROR"
+              exit 1
+            fi
+          else
+            echo "API health monitor created."
+          fi
+
+      - name: Create monitor — Frontend
+        if: github.event.inputs.action == 'create'
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+        run: |
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "FRONTEND_URL not set — skipping frontend monitor"
+            exit 0
+          fi
+
+          echo "Creating monitor for $FRONTEND_URL ..."
+
+          RESPONSE=$(curl -s -X POST "https://api.uptimerobot.com/v2/newMonitor" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "api_key=${{ secrets.UPTIMEROBOT_API_KEY }}" \
+            --data-urlencode "friendly_name=NSE AI - Frontend" \
+            --data-urlencode "url=$FRONTEND_URL" \
+            -d "type=1&interval=300&http_method=1")
+
+          echo "$RESPONSE" | python3 -m json.tool
+
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stat',''))" 2>/dev/null)
+          if [ "$STATUS" != "ok" ]; then
+            ERROR=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error',{}).get('message','unknown'))" 2>/dev/null)
+            if echo "$ERROR" | grep -qi "already"; then
+              echo "::warning::Monitor for frontend already exists — skipping"
+            else
+              echo "::error::Failed to create frontend monitor: $ERROR"
+              exit 1
+            fi
+          else
+            echo "Frontend monitor created."
+          fi
+
+      - name: Summary
+        if: github.event.inputs.action == 'create'
+        run: |
+          echo ""
+          echo "Monitors configured. Next steps:"
+          echo "  1. Go to https://uptimerobot.com → Dashboard and verify both monitors show 'Up'"
+          echo "  2. Under Alert Contacts, add your email to receive down/up notifications"
+          echo "  3. Edit each monitor → Alert When Down For: 2 checks (= 10 min)"
