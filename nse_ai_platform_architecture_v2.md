@@ -1,7 +1,7 @@
 # NSE AI Research Platform — Complete Technical Specification
 
 > **Stack update:** This document supersedes the Next.js/Fastify version.  
-> Frontend → **React 19 + Vite 6** | API → **Node.js 22 + Express 4** | Deploy → **Netlify (frontend) + Vultr VPS (API/workers)**
+> Frontend → **React 19 + Vite 6** | API → **Node.js 22 + Express 4** | Deploy → **Netlify (frontend) + Railway (API) + GitHub Actions (workers)**
 
 ---
 
@@ -17,19 +17,19 @@ An AI-powered financial research system for the **Nairobi Securities Exchange (N
 ┌─────────────────────────────────────────────────────────┐
 │                    CLIENT LAYER                          │
 │         React 19 + Vite 6  (Netlify CDN)                │
-│   React Router v6 · Tailwind CSS v4 · Recharts          │
+│   React Router v6 · Tailwind CSS v4 · Motion            │
 └──────────────────────┬──────────────────────────────────┘
-                       │ HTTPS / REST + SSE
+                       │ HTTPS / REST
 ┌──────────────────────▼──────────────────────────────────┐
 │                    API LAYER                             │
-│         Node.js 22 + Express 4  (Vultr VPS / Nginx)     │
+│         Node.js 22 + Express 4  (Railway)               │
 │   JWT Auth · Zod validation · Rate limiting             │
 └──────┬────────────────────────────┬─────────────────────┘
        │                            │
 ┌──────▼──────┐            ┌────────▼────────┐
 │  Supabase   │            │  Python Workers │
-│ PostgreSQL  │◄───────────│  (systemd timer) │
-│ + RLS       │            │  yfinance · AI  │
+│ PostgreSQL  │◄───────────│  GitHub Actions │
+│ + RLS       │            │  (cron schedule)│
 └─────────────┘            └─────────────────┘
 ```
 
@@ -39,70 +39,81 @@ An AI-powered financial research system for the **Nairobi Securities Exchange (N
 
 | Layer | Technology | Version | Notes |
 |-------|-----------|---------|-------|
-| Frontend | React | 19 | Replaces Next.js 14 |
-| Build tool | Vite | 6 | Replaces Next.js compiler |
+| Frontend | React | 19 | Replaced Next.js 14 |
+| Build tool | Vite | 6 | Replaced Next.js compiler |
 | Routing | React Router | 6 | Client-side SPA routing |
 | Styling | Tailwind CSS | 4 | Via `@tailwindcss/vite` plugin |
-| Animation | Motion (Framer) | 12 | Page transitions & charts |
-| Charts | Recharts | 2.x | Financial chart components |
-| API framework | Express | 4 | Replaces Fastify |
-| Runtime | Node.js | 20 LTS | API + workers runtime |
+| Animation | Motion (Framer) | 12 | Page transitions & micro-animations |
+| Charts | Custom SVG | — | StockChart component using viewBox + preserveAspectRatio |
+| API framework | Express | 4 | Replaced Fastify |
+| Runtime | Node.js | 22 LTS | API runtime |
 | Language | TypeScript | 5.x | Full-stack |
-| Data workers | Python | 3.11 | yfinance, pandas, anthropic |
-| Database | PostgreSQL 15 | via Supabase | RLS enforced |
-| AI model | Claude | claude-sonnet-4-6 | Signal generation (cached system prompt) |
-| AI (fast) | Claude | claude-haiku-4-5-20251001 | Event classification (4× cheaper) |
-| AI (powerful) | Claude | claude-opus-4-6 | Reserved for complex reasoning |
+| Data workers | Python | 3.11 | tvdatafeed, pandas, anthropic |
+| Database | PostgreSQL 15 | via Supabase | RLS enforced, `nse` schema |
+| AI model | Claude | claude-sonnet-4-6 | Signal generation + event classification |
+| AI (fast) | Claude | claude-haiku-4-5-20251001 | Email summaries (4× cheaper) |
 | Auth | Supabase Auth | 2.x | JWT + refresh tokens |
-| Frontend host | Netlify | — | CDN + edge functions |
-| API host | Vultr VPS | Ubuntu 24.04 | Nginx + PM2, 127.0.0.1 bind |
-| Workers host | Vultr VPS | Ubuntu 24.04 | systemd timers (EAT schedule) |
+| Frontend host | Netlify | — | CDN + SPA redirect rule |
+| API host | Railway | — | Auto-deploy from `main` branch |
+| Workers host | GitHub Actions | — | Cron-scheduled, NSE market hours |
 
 ---
 
 ## 4. Repository Structure
 
 ```
-nse-ai-platform/
+nse-ai-tracker/
 ├── frontend/                    # React + Vite app
 │   ├── src/
-│   │   ├── components/          # Atomic UI components
-│   │   ├── pages/               # Route-level page components
-│   │   ├── hooks/               # Custom React hooks
-│   │   ├── services/            # API client, auth helpers
-│   │   ├── store/               # Zustand state management
-│   │   ├── tokens/              # Design tokens (colors, type, spacing)
-│   │   └── styles/              # globals.css, tailwind base
-│   ├── index.html
+│   │   ├── api/                 # Typed API client (client.ts)
+│   │   ├── auth/                # Supabase client + AuthContext
+│   │   ├── components/
+│   │   │   ├── layout/          # Sidebar, layout wrapper
+│   │   │   └── nse/             # StockCard, StockChart, StockDetail,
+│   │   │                        # AIAnalysis, CompanySearch, MarketHeader
+│   │   ├── data/                # nseData.ts (static fallback + types)
+│   │   ├── hooks/               # useDebounce, useAIRequest
+│   │   └── pages/               # Route-level page components
+│   │       ├── DashboardPage.tsx
+│   │       ├── TrendsPage.tsx       ← new
+│   │       ├── NSETracker.tsx
+│   │       ├── PortfolioPage.tsx
+│   │       ├── EventsPage.tsx       ← Events + News tabs, paginated
+│   │       ├── SettingsPage.tsx     ← includes AI token usage
+│   │       └── LoginPage.tsx
 │   ├── vite.config.ts
-│   ├── tailwind.config.ts
 │   └── package.json
-├── api/                         # Express API
+├── api/                         # Express API (deployed on Railway)
 │   ├── src/
-│   │   ├── routes/              # Express routers
-│   │   ├── middleware/          # auth, rateLimit, errorHandler
-│   │   ├── services/            # supabaseAdmin, claudeClient
-│   │   ├── schemas/             # Zod validation schemas
-│   │   └── index.ts             # Express app entry
-│   ├── tsconfig.json
+│   │   ├── routes/
+│   │   │   ├── signals.ts       # GET /api/signals, /api/signals/latest
+│   │   │   ├── stocks.ts        # GET /api/stocks, /api/stocks/:ticker/prices
+│   │   │   ├── portfolio.ts     # GET/POST/PUT/DELETE /api/portfolio
+│   │   │   ├── watchlist.ts     # GET/POST/DELETE /api/watchlist
+│   │   │   ├── events.ts        # GET /api/events  (offset pagination)
+│   │   │   ├── news.ts          # GET /api/news    (offset pagination)
+│   │   │   ├── usage.ts         # GET /api/usage   (daily_ai_cost view)
+│   │   │   ├── macro.ts         # GET /api/macro
+│   │   │   └── notify.ts        # POST /api/notify (NOTIFY_SECRET protected)
+│   │   ├── middleware/          # auth, errorHandler, requestLogger,
+│   │   │                        # security, aiSecurity, aiRateLimit
+│   │   ├── services/            # supabase.ts, logger.ts
+│   │   └── tests/               # Vitest + Supertest (51 tests, 100% fn coverage)
 │   └── package.json
-├── workers/                     # Python data workers
-│   ├── price_collector.py
-│   ├── news_collector.py
-│   ├── ai_worker.py
-│   ├── portfolio_worker.py
-│   ├── send_digest.py
-│   ├── services/
-│   │   ├── db.py
-│   │   └── ai.py
-│   ├── models/
-│   ├── tests/
+├── workers/                     # Python data workers (GitHub Actions)
+│   ├── price_collector.py       # tvdatafeed — intraday + EOD prices
+│   ├── news_fetcher.py          # RSS + web scraping
+│   ├── event_detector.py        # Pattern detection + Claude classification
+│   ├── ai_worker.py             # Claude signal generation
+│   ├── email_worker.py          # Top-5 movers digest with related news
 │   └── requirements.txt
 ├── supabase/
-│   ├── migrations/
-│   └── config.toml
+│   └── migrations/              # 001–009 SQL migrations
 ├── .github/workflows/
-├── .env.example
+│   ├── test.yml                 # frontend lint+build, api tests+coverage
+│   ├── deploy.yml               # Netlify (frontend) + Railway (api)
+│   ├── workers.yml              # Python workers on NSE cron schedule
+│   └── health-check.yml         # API + frontend uptime every 15 min (EAT hours)
 ├── savepoints.json
 └── README.md
 ```
@@ -198,12 +209,12 @@ export default defineConfig(({ mode }) => {
 ```typescript
 // frontend/src/App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthGuard } from './components/AuthGuard';
+import ProtectedRoute  from './auth/ProtectedRoute';
 import DashboardPage   from './pages/DashboardPage';
-import SignalsPage     from './pages/SignalsPage';
-import StockPage       from './pages/StockPage';
+import TrendsPage      from './pages/TrendsPage';      // NSE equities, 15-month data
 import PortfolioPage   from './pages/PortfolioPage';
-import SettingsPage    from './pages/SettingsPage';
+import EventsPage      from './pages/EventsPage';      // Events + News tabs
+import SettingsPage    from './pages/SettingsPage';    // Watchlist + AI token usage
 import LoginPage       from './pages/LoginPage';
 
 export default function App() {
@@ -211,12 +222,12 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route element={<AuthGuard />}>
+        <Route element={<ProtectedRoute />}>
           <Route path="/"           element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard"  element={<DashboardPage />} />
-          <Route path="/signals"    element={<SignalsPage />} />
-          <Route path="/stocks/:ticker" element={<StockPage />} />
+          <Route path="/trends"     element={<TrendsPage />} />
           <Route path="/portfolio"  element={<PortfolioPage />} />
+          <Route path="/events"     element={<EventsPage />} />
           <Route path="/settings"   element={<SettingsPage />} />
         </Route>
       </Routes>
@@ -224,6 +235,8 @@ export default function App() {
   );
 }
 ```
+
+**Navigation order (Sidebar):** Dashboard → Trends → Portfolio → Events → Settings
 
 ### 6.3 Auth Guard (replaces Next.js middleware)
 
@@ -243,29 +256,42 @@ export function AuthGuard() {
 ### 6.4 API Client
 
 ```typescript
-// frontend/src/services/api.ts
-const BASE = import.meta.env.VITE_API_URL;   // was process.env.NEXT_PUBLIC_API_URL
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.json());
-  return res.json();
-}
+// frontend/src/api/client.ts
+const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 export const api = {
-  signals:    () => request<Signal[]>('/api/signals'),
-  stock:      (ticker: string) => request<StockDetail>(`/api/stocks/${ticker}`),
-  portfolio:  () => request<Allocation[]>('/api/portfolio'),
-  watchlist:  () => request<string[]>('/api/watchlist'),
+  stocks: {
+    list:   ()                          => apiFetch<Company[]>("/api/stocks"),
+    detail: (ticker)                    => apiFetch(`/api/stocks/${ticker}`),
+    prices: (ticker, days = 90)         => apiFetch<StockPrice[]>(`/api/stocks/${ticker}/prices?days=${days}`),
+  },
+  signals: {
+    list:   (params?)                   => apiFetch<Signal[]>(`/api/signals?${new URLSearchParams(params)}`),
+    latest: ()                          => apiFetch<Signal[]>("/api/signals/latest"),
+  },
+  portfolio: {
+    list:   ()                          => apiFetch<Allocation[]>("/api/portfolio"),
+    upsert: (ticker, weight, rationale) => apiFetch<Allocation>("/api/portfolio", { method: "POST", ... }),
+    update: (ticker, weight)            => apiFetch<Allocation>(`/api/portfolio/${ticker}`, { method: "PUT", ... }),
+    remove: (ticker)                    => fetch(`${BASE}/api/portfolio/${ticker}`, { method: "DELETE", ... }),
+  },
+  watchlist: {
+    list:   ()                          => apiFetch<string[]>("/api/watchlist"),
+    add:    (ticker)                    => apiFetch("/api/watchlist", { method: "POST", ... }),
+    remove: (ticker)                    => fetch(`${BASE}/api/watchlist/${ticker}`, { method: "DELETE", ... }),
+  },
+  events: {
+    list:   (params?)                   => apiFetch<MarketEvent[]>(`/api/events?${new URLSearchParams(params)}`),
+  },
+  news: {
+    list:   (params?)                   => apiFetch<NewsArticle[]>(`/api/news?${new URLSearchParams(params)}`),
+  },
+  usage: {
+    daily:  (days = 30)                 => apiFetch<DailyUsage[]>(`/api/usage?days=${days}`),
+  },
+  macro: {
+    list:   ()                          => apiFetch<MacroIndicator[]>("/api/macro"),
+  },
 };
 ```
 
@@ -273,54 +299,31 @@ export const api = {
 
 ## 7. API Layer (Express)
 
-### 7.1 App Entry
+### 7.1 Route Summary
 
-```typescript
-// api/src/index.ts
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit';
-import { signalsRouter }   from './routes/signals';
-import { stocksRouter }    from './routes/stocks';
-import { portfolioRouter } from './routes/portfolio';
-import { watchlistRouter } from './routes/watchlist';
-import { authMiddleware }  from './middleware/auth';
-import { errorHandler }    from './middleware/errorHandler';
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/health` | — | Lightweight ping |
+| GET | `/health/detailed` | — | DB latency + row counts |
+| GET | `/api/stocks` | ✓ | List all companies |
+| GET | `/api/stocks/:ticker` | ✓ | Company + latest price + signal |
+| GET | `/api/stocks/:ticker/prices` | ✓ | OHLCV history, `days` up to 600 |
+| GET | `/api/signals` | ✓ | Signals with filters; paginated |
+| GET | `/api/signals/latest` | ✓ | Latest signal per ticker |
+| GET | `/api/portfolio` | ✓ | List allocations (with company join) |
+| POST | `/api/portfolio` | ✓ | Upsert allocation |
+| PUT | `/api/portfolio/:ticker` | ✓ | Update weight |
+| DELETE | `/api/portfolio/:ticker` | ✓ | Remove holding |
+| GET | `/api/watchlist` | ✓ | List watchlist tickers |
+| POST | `/api/watchlist` | ✓ | Add ticker |
+| DELETE | `/api/watchlist/:ticker` | ✓ | Remove ticker |
+| GET | `/api/events` | ✓ | Detected events; severity filter; `limit`+`offset` pagination |
+| GET | `/api/news` | ✓ | News articles; ticker filter; `limit`+`offset`+`days` |
+| GET | `/api/usage` | ✓ | Daily AI token usage from `daily_ai_cost` view |
+| GET | `/api/macro` | ✓ | Macro indicators |
+| POST | `/api/notify` | `X-Notify-Secret` | Webhook trigger for deploy notifications |
 
-const app = express();
-
-// ── Security middleware ───────────────────────────────────
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", process.env.SUPABASE_URL!],
-    },
-  },
-}));
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') ?? '*' }));
-app.use(express.json({ limit: '10kb' }));
-
-// ── Rate limiting ─────────────────────────────────────────
-app.use('/api/', rateLimit({ windowMs: 60_000, max: 60 }));
-app.use('/api/signals', rateLimit({ windowMs: 60_000, max: 20 }));
-
-// ── Routes ────────────────────────────────────────────────
-app.use('/api/signals',   authMiddleware, signalsRouter);
-app.use('/api/stocks',    authMiddleware, stocksRouter);
-app.use('/api/portfolio', authMiddleware, portfolioRouter);
-app.use('/api/watchlist', authMiddleware, watchlistRouter);
-
-// ── Error handler ─────────────────────────────────────────
-app.use(errorHandler);
-
-app.listen(process.env.PORT ?? 4000, () =>
-  console.log(`API running on port ${process.env.PORT ?? 4000}`)
-);
-```
+**Global middleware order:** `requestLogger` → `requestId` → `stripServerHeader` → `blockPathTraversal` → `express.json` → `requireJson` → cache-control no-cache → rate limit (60/min global, 20/min signals) → `promptInjectionGuard` → routes → `errorHandler`
 
 ### 7.2 Auth Middleware (replaces Fastify hooks)
 
